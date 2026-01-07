@@ -259,10 +259,11 @@
             else if(mode === "RUNNING") modeText.className = "text-2xl bmw-font text-[#ff9b00] mt-1 animate-pulse";
             else modeText.className = "text-2xl bmw-font text-white mt-1";
 
-            updateIcon('icon-lock', data.locked, 'text-red-500');
-            updateIcon('icon-engine', data.run, 'text-[#ff9b00]');
-            updateIcon('icon-acc', data.acc, 'text-blue-400');
-            updateIcon('icon-ign', data.ign, 'text-green-400');
+            // CORRECCION: Especificar nombre del icono explicito
+            updateIcon('icon-lock', 'fa-lock', data.locked, 'text-red-500');
+            updateIcon('icon-engine', 'fa-power-off', data.run, 'text-[#ff9b00]');
+            updateIcon('icon-acc', 'fa-bolt', data.acc, 'text-blue-400');
+            updateIcon('icon-ign', 'fa-key', data.ign, 'text-green-400');
 
             if(data.gps && data.gps.includes(",")) {
                 const parts = data.gps.split(",");
@@ -272,10 +273,11 @@
             }
         }
 
-        function updateIcon(id, isActive, activeClass) {
+        function updateIcon(id, iconName, isActive, activeClass) {
             const el = document.getElementById(id);
-            if(isActive) el.className = `fas ${id.replace('icon-','fa-')} text-xl ${activeClass} drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]`;
-            else el.className = `fas ${id.replace('icon-','fa-')} text-xl text-gray-700`;
+            // CORRECCION: Usar iconName en lugar de id.replace
+            if(isActive) el.className = `fas ${iconName} text-xl ${activeClass} drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]`;
+            else el.className = `fas ${iconName} text-xl text-gray-700`;
         }
     </script>
 </body>
