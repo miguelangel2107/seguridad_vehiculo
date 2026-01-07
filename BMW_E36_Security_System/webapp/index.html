@@ -77,8 +77,10 @@
 
         <!-- Dashboard -->
         <div class="bg-[#111] rounded-2xl p-4 border border-gray-800 shadow-2xl mb-4 relative overflow-hidden shrink-0">
-            <div class="absolute top-0 right-0 w-20 h-20 bg-[#ff9b00] opacity-5 blur-2xl rounded-full"></div>
-            <div class="grid grid-cols-2 gap-4 text-center">
+            <!-- Silueta de auto blanca en el fondo -->
+            <img src="https://cdn-icons-png.flaticon.com/512/55/55283.png" class="absolute top-2 right-2 w-24 h-24 opacity-10 rotate-12" style="filter: invert(1);">
+            
+            <div class="grid grid-cols-2 gap-4 text-center relative z-10">
                 <div class="col-span-2 mb-1">
                     <h1 id="vehicle-mode" class="text-2xl bmw-font text-white mt-1">BLOQUEADO</h1>
                 </div>
@@ -171,7 +173,13 @@
                 attribution: '&copy; OpenStreetMap',
                 maxZoom: 19
             }).addTo(map);
-            const icon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3097/3097136.png', iconSize: [30, 30], iconAnchor: [15, 15] });
+            
+            // ICONO ROJO DEPORTIVO PARA MEJOR VISIBILIDAD
+            const icon = L.icon({ 
+                iconUrl: 'https://cdn-icons-png.flaticon.com/512/3097/3097180.png', 
+                iconSize: [35, 35], 
+                iconAnchor: [17, 17] 
+            });
             marker = L.marker([-16.5000, -68.1500], {icon: icon}).addTo(map);
         }
 
