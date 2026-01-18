@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BMW E36 Security System</title>
+    <title>BMW E36 Security System V3.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <!-- Leaflet para Mapas -->
@@ -12,18 +12,37 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;500;700&display=swap');
         
-        body { font-family: 'Roboto', sans-serif; background-color: #050505; color: #e0e0e0; }
+        body { font-family: 'Roboto', sans-serif; background-color: #080808; color: #e0e0e0; }
         .bmw-font { font-family: 'Orbitron', sans-serif; }
         
+        /* Efecto Vidrio / Cards */
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Botones Neumórficos Oscuros */
         .btn-control {
-            background: linear-gradient(145deg, #1a1a1a, #0d0d0d);
-            box-shadow: 5px 5px 10px #050505, -5px -5px 10px #262626;
-            transition: all 0.2s ease;
+            background: linear-gradient(145deg, #161616, #0f0f0f);
+            border: 1px solid #222;
+            box-shadow: 4px 4px 8px #050505, -4px -4px 8px #1f1f1f;
+            transition: all 0.15s ease;
         }
         .btn-control:active {
-            box-shadow: inset 5px 5px 10px #050505, inset -5px -5px 10px #262626;
+            box-shadow: inset 4px 4px 8px #050505, inset -4px -4px 8px #1f1f1f;
+            transform: scale(0.98);
+        }
+
+        /* Botón Llave Especial */
+        .btn-key-active {
+            background: linear-gradient(135deg, #4f46e5 0%, #312e81 100%);
+            border: 1px solid #6366f1;
+            box-shadow: 0 0 15px rgba(79, 70, 229, 0.4);
         }
         
         /* Mapa oscuro */
@@ -32,112 +51,260 @@
 
         /* Login */
         #login-screen {
-            background-image: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.9)), url('https://images.unsplash.com/photo-1616455579100-2ceaa4eb2d37?q=80&w=1000&auto=format&fit=crop');
+            background-image: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.95)), url('https://images.unsplash.com/photo-1616455579100-2ceaa4eb2d37?q=80&w=1000&auto=format&fit=crop');
             background-size: cover; background-position: center;
         }
+
+        /* Barra de progreso Bateria */
+        .battery-bar-bg { background: #333; height: 6px; border-radius: 3px; overflow: hidden; }
+        .battery-bar-fill { height: 100%; transition: width 0.5s ease, background-color 0.5s ease; }
+
+        /* Notificación Toast */
+        #toast-notification {
+            transform: translateY(-150%);
+            transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        }
+        #toast-notification.show {
+            transform: translateY(0);
+        }
+        /* Tipo de Alerta Dinamico */
+        .toast-success { border-left-color: #3b82f6; }
+        .toast-success .icon-bg { background: rgba(59, 130, 246, 0.2); }
+        .toast-success i { color: #3b82f6; }
+        .toast-success h4 { color: #3b82f6; }
+
+        .toast-danger { border-left-color: #ef4444; }
+        .toast-danger .icon-bg { background: rgba(239, 68, 68, 0.2); }
+        .toast-danger i { color: #ef4444; }
+        .toast-danger h4 { color: #ef4444; }
+
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
-<body class="h-screen w-screen overflow-hidden select-none flex flex-col">
+<body class="h-screen w-screen overflow-hidden select-none flex flex-col relative">
 
-    <!-- LOGIN -->
+    <!-- TOAST NOTIFICATION (ALERTA) -->
+    <div id="toast-notification" class="absolute top-4 left-4 right-4 z-[1000] glass-panel rounded-xl p-4 border-l-4 flex items-center gap-4 shadow-2xl toast-success">
+        <div class="w-10 h-10 rounded-full icon-bg flex items-center justify-center shrink-0">
+            <i id="toast-icon" class="fas fa-face-smile text-xl"></i>
+        </div>
+        <div>
+            <h4 id="toast-title" class="text-xs font-bold uppercase tracking-widest">Notificación</h4>
+            <p id="toast-message" class="text-sm text-white font-medium">Mensaje del sistema</p>
+        </div>
+    </div>
+
+    <!-- LOGIN SCREEN -->
     <div id="login-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center text-center p-6 transition-opacity duration-700">
         <div class="mb-8 animate-pulse">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/2048px-BMW.svg.png" alt="BMW Logo" class="w-24 h-24 mx-auto mb-4 drop-shadow-2xl">
         </div>
-        <h1 class="text-3xl font-bold text-white mb-2 bmw-font tracking-wider">BMW E36 328i</h1>
-        <p class="text-gray-300 text-lg mb-8 font-light">David Lopez</p>
+        <h1 class="text-3xl font-bold text-white mb-2 bmw-font tracking-wider">BMW E36</h1>
+        <p class="text-gray-400 text-sm mb-8 tracking-[0.2em]">SECURITY SYSTEM V3.1</p>
         
         <div class="w-full max-w-xs space-y-4">
-            <input type="password" id="pin-code" placeholder="PIN" class="w-full bg-white/10 border border-white/20 rounded-full px-6 py-3 text-center text-white placeholder-gray-400 focus:outline-none focus:border-[#ff9b00] font-mono text-xl">
-            <button onclick="attemptLogin()" class="w-full bg-[#ff9b00] hover:bg-[#e68a00] text-black font-bold py-3 rounded-full shadow-lg transform active:scale-95 transition-all">
-                INICIAR
+            <input type="password" id="pin-code" placeholder="ACCESS CODE" class="w-full bg-white/5 border border-white/10 rounded-full px-6 py-4 text-center text-white placeholder-gray-500 focus:outline-none focus:border-[#ff9b00] font-mono text-xl tracking-widest transition-colors">
+            <button onclick="attemptLogin()" class="w-full bg-[#ff9b00] hover:bg-[#e68a00] text-black font-bold py-4 rounded-full shadow-lg shadow-orange-900/20 transform active:scale-95 transition-all tracking-wider">
+                UNLOCK SYSTEM
             </button>
         </div>
-        <p id="login-error" class="text-red-500 mt-4 hidden text-sm">PIN Incorrecto</p>
+        <p id="login-error" class="text-red-500 mt-4 hidden text-xs uppercase tracking-widest">Access Denied</p>
     </div>
 
-    <!-- APP -->
-    <div id="main-app" class="hidden h-full flex flex-col p-4 max-w-md mx-auto w-full relative overflow-y-auto">
+    <!-- MAIN APP -->
+    <div id="main-app" class="hidden h-full flex flex-col p-4 max-w-md mx-auto w-full relative overflow-y-auto pb-24">
         
-        <!-- Header Personalizado -->
-        <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6">
             <div class="flex items-center gap-3">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/1024px-BMW.svg.png" class="w-6 h-6">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/1024px-BMW.svg.png" class="w-8 h-8 drop-shadow-md">
                 <div>
-                    <div id="connection-status" class="text-xs text-red-500 flex items-center gap-1">
-                        <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Offline
+                    <div id="connection-status" class="text-[10px] text-gray-500 flex items-center gap-1.5 uppercase font-bold tracking-wider bg-white/5 px-2 py-1 rounded-full">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> Offline
                     </div>
                 </div>
             </div>
             <div class="text-right">
-                <div class="text-sm font-bold text-white bmw-font tracking-wide">BMW E36 328i</div>
-                <div class="text-[10px] text-gray-400 uppercase tracking-widest">David Lopez</div>
+                <div class="text-xs font-bold text-white bmw-font tracking-widest">328i SECURITY</div>
             </div>
         </div>
 
-        <!-- Dashboard -->
-        <div class="bg-[#111] rounded-2xl p-4 border border-gray-800 shadow-2xl mb-4 relative overflow-hidden shrink-0">
-            <!-- Silueta de auto blanca en el fondo -->
-            <img src="https://cdn-icons-png.flaticon.com/512/55/55283.png" class="absolute top-2 right-2 w-24 h-24 opacity-10 rotate-12" style="filter: invert(1);">
+        <!-- Dashboard Principal -->
+        <div class="glass-panel rounded-3xl p-5 mb-5 relative overflow-hidden shrink-0">
+            <!-- Fondo decorativo -->
+            <div class="absolute -right-4 -top-4 w-32 h-32 bg-blue-900/20 rounded-full blur-3xl"></div>
+            <div class="absolute -left-4 -bottom-4 w-32 h-32 bg-red-900/10 rounded-full blur-3xl"></div>
             
-            <div class="grid grid-cols-2 gap-4 text-center relative z-10">
-                <div class="col-span-2 mb-1">
-                    <h1 id="vehicle-mode" class="text-2xl bmw-font text-white mt-1">BLOQUEADO</h1>
+            <div class="relative z-10">
+                <!-- Estado Grande -->
+                <div class="text-center mb-6">
+                    <div class="text-[10px] text-gray-500 uppercase tracking-[0.3em] mb-1">Vehicle Status</div>
+                    <h1 id="vehicle-mode" class="text-3xl bmw-font text-white font-bold tracking-wide drop-shadow-lg">LOCKED</h1>
                 </div>
-                <!-- Iconos Estados -->
-                <div class="flex justify-center gap-4 col-span-2">
-                    <i id="icon-lock" class="fas fa-lock text-xl text-red-500"></i>
-                    <i id="icon-acc" class="fas fa-bolt text-xl text-gray-600"></i>
-                    <i id="icon-ign" class="fas fa-key text-xl text-gray-600"></i>
-                    <i id="icon-engine" class="fas fa-power-off text-xl text-gray-600"></i>
+                
+                <!-- Iconos de Estado (LÓGICA CORREGIDA) -->
+                <div class="flex justify-center gap-8 mb-6">
+                    <div class="flex flex-col items-center gap-1">
+                        <i id="icon-lock" class="fas fa-lock text-xl text-gray-700 transition-all duration-300"></i>
+                        <span class="text-[8px] text-gray-600 uppercase">Lock</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-1">
+                        <i id="icon-acc" class="fas fa-bolt text-xl text-gray-700 transition-all duration-300"></i>
+                        <span class="text-[8px] text-gray-600 uppercase">ACC</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-1">
+                        <i id="icon-ign" class="fas fa-key text-xl text-gray-700 transition-all duration-300"></i>
+                        <span class="text-[8px] text-gray-600 uppercase">IGN</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-1">
+                        <i id="icon-engine" class="fas fa-power-off text-xl text-gray-700 transition-all duration-300"></i>
+                        <span class="text-[8px] text-gray-600 uppercase">Run</span>
+                    </div>
+                </div>
+
+                <!-- Monitor de Batería Mejorado -->
+                <div class="bg-black/40 rounded-xl p-3 border border-white/5">
+                    <div class="flex justify-between items-center mb-1">
+                        <div class="flex items-center gap-2">
+                            <i id="batt-icon" class="fas fa-car-battery text-gray-400 text-xs"></i>
+                            <span class="text-xs text-gray-300 font-medium">Batería</span>
+                        </div>
+                        <span id="batt-val" class="text-sm font-bold text-white bmw-font">--.- V</span>
+                    </div>
+                    <div class="battery-bar-bg mb-1">
+                        <div id="batt-bar" class="battery-bar-fill bg-gray-600" style="width: 0%"></div>
+                    </div>
+                    <div class="flex justify-between">
+                        <span id="batt-status-text" class="text-[9px] text-gray-500 uppercase tracking-wider">Sin Datos</span>
+                        <span class="text-[9px] text-gray-600">12V System</span>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Botones Principales -->
-        <div class="grid grid-cols-2 gap-3 mb-4 shrink-0">
-            <button onclick="sendCommand('DESBLOQUEAR')" class="btn-control rounded-xl p-3 flex flex-col items-center gap-1 group">
-                <i class="fas fa-unlock text-xl text-blue-400"></i>
-                <span class="text-xs font-bold text-gray-300">ACC / UNLOCK</span>
+        <!-- Botones de Acción Principal -->
+        <div class="grid grid-cols-2 gap-3 mb-6 shrink-0">
+            <button onclick="sendCommand('DESBLOQUEAR')" class="btn-control rounded-2xl p-4 flex flex-col items-center gap-2 group active:border-blue-500/50">
+                <div class="w-10 h-10 rounded-full bg-blue-900/20 flex items-center justify-center group-active:bg-blue-500/20 transition-colors">
+                    <i class="fas fa-unlock text-xl text-blue-400"></i>
+                </div>
+                <span class="text-[10px] font-bold text-gray-300 tracking-wider">UNLOCK / ACC</span>
             </button>
-            <button onclick="sendCommand('BLOQUEAR')" class="btn-control rounded-xl p-3 flex flex-col items-center gap-1 group">
-                <i class="fas fa-lock text-xl text-red-500"></i>
-                <span class="text-xs font-bold text-gray-300">BLOQUEAR</span>
+            
+            <button onclick="sendCommand('BLOQUEAR')" class="btn-control rounded-2xl p-4 flex flex-col items-center gap-2 group active:border-red-500/50">
+                <div class="w-10 h-10 rounded-full bg-red-900/20 flex items-center justify-center group-active:bg-red-500/20 transition-colors">
+                    <i class="fas fa-lock text-xl text-red-500"></i>
+                </div>
+                <span class="text-[10px] font-bold text-gray-300 tracking-wider">LOCK</span>
             </button>
-            <button onclick="sendCommand('IGNICION')" class="btn-control rounded-xl p-3 flex flex-col items-center gap-1 group">
-                <i class="fas fa-key text-xl text-green-400"></i>
-                <span class="text-xs font-bold text-gray-300">IGNICION</span>
+            
+            <button onclick="sendCommand('IGNICION')" class="btn-control rounded-2xl p-4 flex flex-col items-center gap-2 group active:border-green-500/50">
+                <div class="w-10 h-10 rounded-full bg-green-900/20 flex items-center justify-center group-active:bg-green-500/20 transition-colors">
+                    <i class="fas fa-key text-xl text-green-400"></i>
+                </div>
+                <span class="text-[10px] font-bold text-gray-300 tracking-wider">IGNITION</span>
             </button>
-            <button onclick="sendCommand('ARRANCAR')" class="btn-control rounded-xl p-3 flex flex-col items-center gap-1 border border-[#ff9b00]/30">
-                <i class="fas fa-bolt text-xl text-[#ff9b00]"></i>
-                <span class="text-xs font-bold text-[#ff9b00]">START</span>
+            
+            <button onclick="sendCommandWithConfirm('ARRANCAR', '¿CONFIRMAR ARRANQUE DE MOTOR?')" class="btn-control rounded-2xl p-4 flex flex-col items-center gap-2 border border-[#ff9b00]/30 active:bg-[#ff9b00]/10">
+                <div class="w-10 h-10 rounded-full bg-orange-900/20 flex items-center justify-center group-active:bg-orange-500/20 transition-colors shadow-[0_0_10px_rgba(255,155,0,0.2)]">
+                    <i class="fas fa-bolt text-xl text-[#ff9b00]"></i>
+                </div>
+                <span class="text-[10px] font-bold text-[#ff9b00] tracking-wider">START ENGINE</span>
             </button>
+        </div>
+
+        <!-- Panel de Llave Manual (CHAPA) -->
+        <div class="mb-6">
+            <h3 class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 pl-1">Control Físico (Llave)</h3>
+            <div class="glass-panel rounded-2xl p-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div id="key-status-indicator" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center border border-gray-700 transition-all duration-300">
+                        <i class="fas fa-shield-halved text-gray-500 transition-colors duration-300" id="key-icon-inner"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs font-bold text-white tracking-wide">LLAVE MANUAL</div>
+                        <div id="key-status-text" class="text-[9px] text-gray-500 uppercase tracking-wider">Deshabilitada</div>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="sendCommandWithConfirm('ENABLE_KEY_LOGIC', '¿Habilitar uso de llave física?')" class="bg-gray-800 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-[10px] font-bold border border-gray-700 transition-all active:scale-95">ON</button>
+                    <button onclick="sendCommandWithConfirm('DISABLE_KEY_LOGIC', '¿Deshabilitar llave física?')" class="bg-gray-800 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-[10px] font-bold border border-gray-700 transition-all active:scale-95">OFF</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controles de Sistema (Grid) -->
+        <div class="mb-6">
+            <h3 class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 pl-1">Sistemas & Conectividad</h3>
+            <div class="grid grid-cols-3 gap-3">
+                <!-- WiFi Toggle -->
+                <div class="glass-panel rounded-xl p-3 flex flex-col items-center gap-2">
+                    <div class="flex justify-between w-full items-start">
+                        <i class="fas fa-wifi text-sm text-gray-400"></i>
+                        <div id="wifi-dot" class="w-1.5 h-1.5 rounded-full bg-gray-600"></div>
+                    </div>
+                    <span class="text-[9px] font-bold text-gray-300 mt-1">CAM WIFI</span>
+                    <div class="flex gap-1 w-full mt-1">
+                        <button onclick="sendCommand('CMD_WIFI_ON')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-green-400">ON</button>
+                        <button onclick="sendCommand('CMD_WIFI_OFF')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-red-400">OFF</button>
+                    </div>
+                </div>
+
+                <!-- GPS Toggle -->
+                <div class="glass-panel rounded-xl p-3 flex flex-col items-center gap-2">
+                    <div class="flex justify-between w-full items-start">
+                        <i class="fas fa-satellite-dish text-sm text-gray-400"></i>
+                        <div id="gps-dot" class="w-1.5 h-1.5 rounded-full bg-gray-600"></div>
+                    </div>
+                    <span class="text-[9px] font-bold text-gray-300 mt-1">GPS MOD</span>
+                    <div class="flex gap-1 w-full mt-1">
+                        <button onclick="sendCommand('CMD_GPS_ON')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-green-400">ON</button>
+                        <button onclick="sendCommand('CMD_GPS_OFF')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-red-400">OFF</button>
+                    </div>
+                </div>
+
+                <!-- Display Toggle -->
+                <div class="glass-panel rounded-xl p-3 flex flex-col items-center gap-2">
+                    <div class="flex justify-between w-full items-start">
+                        <i class="fas fa-tv text-sm text-gray-400"></i>
+                        <div class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_5px_blue]"></div>
+                    </div>
+                    <span class="text-[9px] font-bold text-gray-300 mt-1">DISPLAYS</span>
+                    <div class="flex gap-1 w-full mt-1">
+                        <button onclick="sendCommand('DISPLAY_ON_ALL')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-blue-400">ON</button>
+                        <button onclick="sendCommand('DISPLAY_OFF_ALL')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-gray-400">OFF</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Mapa -->
-        <div class="bg-[#111] rounded-xl border border-gray-800 p-1 mb-4 shrink-0 relative">
+        <div class="glass-panel rounded-xl p-1 mb-6 shrink-0 relative border border-gray-800">
             <div id="map"></div>
-            <div class="absolute bottom-2 left-2 bg-black/70 px-2 py-1 rounded text-[10px] text-white z-10">
-                GPS: <span id="gps-coords-text">Esperando...</span>
+            <div class="absolute bottom-2 left-2 bg-black/80 backdrop-blur-sm px-2 py-1 rounded text-[9px] text-white z-[400] border border-white/10">
+                <i class="fas fa-location-arrow text-blue-400 mr-1"></i> <span id="gps-coords-text">Esperando señal...</span>
+            </div>
+            <div class="absolute top-2 right-2 z-[400] flex flex-col gap-1">
+                 <button onclick="sendCommand('GET_HISTORY_LAST_50')" class="bg-black/80 text-white w-7 h-7 rounded flex items-center justify-center hover:bg-blue-600 transition-colors"><i class="fas fa-history text-xs"></i></button>
+                 <button onclick="clearMapHistory()" class="bg-black/80 text-white w-7 h-7 rounded flex items-center justify-center hover:bg-red-600 transition-colors"><i class="fas fa-trash text-xs"></i></button>
             </div>
         </div>
 
         <!-- Funciones Extra -->
-        <div class="grid grid-cols-4 gap-2 pb-6">
-             <button onclick="sendCommand('ABRIR_PUERTA')" class="btn-control rounded-xl p-3 flex flex-col items-center justify-center gap-1 border border-blue-500/30">
-                <i class="fas fa-door-open text-blue-400"></i> <span class="text-[9px]">PUERTA</span>
+        <div class="grid grid-cols-3 gap-3 pb-4">
+             <button onclick="sendCommandWithConfirm('ABRIR_PUERTA', '¿Abrir seguros?')" class="btn-control rounded-xl p-3 flex flex-col items-center justify-center gap-1 border-b-2 border-b-blue-900 active:border-b-0 translate-y-0 active:translate-y-0.5 transition-all">
+                <i class="fas fa-door-open text-blue-400 text-lg"></i> 
+                <span class="text-[9px] font-bold text-gray-400">PUERTAS</span>
             </button>
             
-             <button onclick="registrarHuella()" class="btn-control rounded-xl p-3 flex flex-col items-center justify-center gap-1 border border-purple-500/30">
-                <i class="fas fa-fingerprint text-purple-400"></i> <span class="text-[9px]">HUELLA</span>
+             <button onclick="registrarHuella()" class="btn-control rounded-xl p-3 flex flex-col items-center justify-center gap-1 border-b-2 border-b-purple-900 active:border-b-0 translate-y-0 active:translate-y-0.5 transition-all">
+                <i class="fas fa-fingerprint text-purple-400 text-lg"></i> 
+                <span class="text-[9px] font-bold text-gray-400">REG. HUELLA</span>
             </button>
 
-            <button onclick="sendCommand('TOGGLE_DATA')" class="btn-control rounded-xl p-3 flex flex-col items-center justify-center gap-1 border border-yellow-500/30">
-                <i class="fas fa-wifi text-yellow-400"></i> <span class="text-[9px]">DATOS</span>
-            </button>
-
-             <button onclick="sendCommand('APAGAR')" class="bg-red-900/80 rounded-xl p-3 flex flex-col items-center justify-center gap-1 border border-red-500 text-white">
-                <i class="fas fa-stop-circle"></i> <span class="text-[9px] font-bold">APAGAR</span>
+             <button onclick="sendCommandWithConfirm('APAGAR', '¡ADVERTENCIA! ¿CORTAR ENCENDIDO?')" class="bg-gradient-to-br from-red-900 to-red-950 rounded-xl p-3 flex flex-col items-center justify-center gap-1 border border-red-800 shadow-[0_0_10px_rgba(255,0,0,0.1)] active:scale-95 transition-all">
+                <i class="fas fa-stop-circle text-white text-lg drop-shadow-md"></i> 
+                <span class="text-[9px] font-bold text-white tracking-widest">KILL SWITCH</span>
             </button>
         </div>
 
@@ -148,11 +315,13 @@
         const MQTT_BROKER = "broker.hivemq.com";
         const MQTT_PORT = 8884; // SSL WebSockets
         const MQTT_CLIENT_ID = "WebBMW_" + Math.random().toString(16).substr(2, 6);
-        const TOPIC_SUB = "vehiculo/estado_json";
+        const TOPIC_SUB_STATUS = "vehiculo/estado_json";
+        const TOPIC_SUB_HIST = "vehiculo/historial";
         const TOPIC_PUB = "vehiculo/control";
 
         let client;
-        let map, marker;
+        let map, marker, polyline;
+        let pathCoords = [];
 
         function attemptLogin() {
             const pin = document.getElementById('pin-code').value;
@@ -164,7 +333,11 @@
                     initMap();
                     connectMQTT();
                 }, 700);
-            } else document.getElementById('login-error').classList.remove('hidden');
+            } else {
+                const err = document.getElementById('login-error');
+                err.classList.remove('hidden');
+                err.classList.add('animate-pulse');
+            }
         }
 
         function initMap() {
@@ -174,13 +347,13 @@
                 maxZoom: 19
             }).addTo(map);
             
-            // ICONO ROJO DEPORTIVO PARA MEJOR VISIBILIDAD
             const icon = L.icon({ 
                 iconUrl: 'https://cdn-icons-png.flaticon.com/512/3097/3097180.png', 
                 iconSize: [35, 35], 
                 iconAnchor: [17, 17] 
             });
             marker = L.marker([-16.5000, -68.1500], {icon: icon}).addTo(map);
+            polyline = L.polyline([], {color: '#ff9b00', weight: 4}).addTo(map);
         }
 
         function updateMap(lat, lon) {
@@ -188,7 +361,20 @@
             const newLatLng = new L.LatLng(lat, lon);
             marker.setLatLng(newLatLng);
             map.panTo(newLatLng);
-            document.getElementById('gps-coords-text').innerText = `${lat}, ${lon}`;
+            document.getElementById('gps-coords-text').innerText = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+        }
+
+        function addToHistory(lat, lon) {
+            if(!map) return;
+            pathCoords.push([lat, lon]);
+            polyline.setLatLngs(pathCoords);
+            if(pathCoords.length === 1) map.panTo([lat, lon]);
+        }
+
+        function clearMapHistory() {
+            pathCoords = [];
+            if(polyline) polyline.setLatLngs([]);
+            sendCommand("CLEAR_HISTORY");
         }
 
         function connectMQTT() {
@@ -198,12 +384,10 @@
             client.onMessageArrived = onMessageArrived;
 
             const options = {
-                useSSL: true,
-                timeout: 3,
-                onSuccess: onConnect,
+                useSSL: true, timeout: 3, onSuccess: onConnect,
                 onFailure: (e) => {
                     console.log("Fallo MQTT: " + e.errorMessage);
-                    document.getElementById('connection-status').innerText = "Reintentando...";
+                    document.getElementById('connection-status').innerText = "RETRYING...";
                     setTimeout(connectMQTT, 5000);
                 }
             };
@@ -212,16 +396,20 @@
 
         function onConnect() {
             console.log("MQTT Online");
-            document.getElementById('connection-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500"></span> Online';
-            document.getElementById('connection-status').className = "text-xs text-green-500 flex items-center gap-1";
-            client.subscribe(TOPIC_SUB);
+            const st = document.getElementById('connection-status');
+            st.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e]"></span> ONLINE';
+            st.classList.remove('text-red-500'); st.classList.add('text-green-500');
+            
+            client.subscribe(TOPIC_SUB_STATUS);
+            client.subscribe(TOPIC_SUB_HIST);
             sendCommand("GET_STATUS");
         }
 
         function onConnectionLost(responseObject) {
             if (responseObject.errorCode !== 0) {
-                console.log("Perdida conexion: " + responseObject.errorMessage);
-                document.getElementById('connection-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Reconectando...';
+                const st = document.getElementById('connection-status');
+                st.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> RECONNECTING';
+                st.classList.add('text-red-500'); st.classList.remove('text-green-500');
                 setTimeout(connectMQTT, 5000);
             }
         }
@@ -231,39 +419,96 @@
             message = new Paho.MQTT.Message(cmd);
             message.destinationName = TOPIC_PUB;
             client.send(message);
-            if(navigator.vibrate) navigator.vibrate(40);
+            if(navigator.vibrate) navigator.vibrate(30);
+        }
+
+        function sendCommandWithConfirm(cmd, text) {
+            if(confirm(text)) sendCommand(cmd);
         }
 
         function registrarHuella() {
-            if(confirm("El sistema entrará en modo registro. Mire la pantalla OLED y el LCD del auto.")) {
-                sendCommand('NUEVA_HUELLA');
+            if(confirm("MODO REGISTRO HUELLA: Siga instrucciones en pantalla OLED.")) sendCommand('NUEVA_HUELLA');
+        }
+
+        function showNotification(title, message, isError = false) {
+            const toast = document.getElementById('toast-notification');
+            const msgEl = document.getElementById('toast-message');
+            const titleEl = document.getElementById('toast-title');
+            const iconEl = document.getElementById('toast-icon');
+            
+            // Estilos dinámicos
+            if (isError) {
+                toast.classList.remove('toast-success');
+                toast.classList.add('toast-danger');
+                iconEl.className = "fas fa-triangle-exclamation text-xl";
+            } else {
+                toast.classList.remove('toast-danger');
+                toast.classList.add('toast-success');
+                iconEl.className = "fas fa-face-smile text-xl";
             }
+
+            titleEl.innerText = title;
+            msgEl.innerText = message;
+            toast.classList.add('show');
+            
+            if(navigator.vibrate) navigator.vibrate(isError ? [200, 100, 200] : [100, 50, 100]);
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 5000);
         }
 
         function onMessageArrived(message) {
             try {
-                let payload = message.payloadString;
-                payload = payload.replace(/'/g, '"');
-                console.log("RX:", payload);
+                let payload = message.payloadString.replace(/'/g, '"');
                 const data = JSON.parse(payload);
-                updateDashboard(data);
+
+                if (message.destinationName === TOPIC_SUB_STATUS) {
+                    // Detectar si es una alerta o un estado normal
+                    if(data.alert) {
+                        if(data.alert === "FACE_UNLOCK") {
+                            showNotification("ACCESO CONCEDIDO", "Reconocimiento Facial: " + (data.user || "Usuario"), false);
+                        } else if(data.alert === "CAM_FAIL") {
+                            showNotification("FALLO DE SISTEMA", "Cámara Desconectada", true);
+                        } else if(data.alert === "FINGER_FAIL") {
+                            showNotification("FALLO DE SISTEMA", "Sensor de Huella Falló", true);
+                        } else if(data.alert === "DISPLAY_FAIL") {
+                            showNotification("FALLO DE SISTEMA", "Error en Pantallas (I2C)", true);
+                        } else if(data.alert === "FINGER_OK") {
+                            showNotification("SISTEMA", "Sensor Huella Recuperado", false);
+                        } else {
+                            showNotification("ALERTA", data.msg || data.alert, true);
+                        }
+                    } else {
+                        updateDashboard(data);
+                    }
+                }
+                else if (message.destinationName === TOPIC_SUB_HIST) {
+                    if(data.lat && data.lon) addToHistory(data.lat, data.lon);
+                }
             } catch (e) { console.error("Error JSON", e); }
         }
 
         function updateDashboard(data) {
+            // Modo
             const modeText = document.getElementById('vehicle-mode');
-            const mode = data.mode || "DESCONOCIDO";
+            const mode = data.mode || "UNKNOWN";
             modeText.innerText = mode;
             
-            if(mode === "LOCKED") modeText.className = "text-2xl bmw-font text-red-500 mt-1";
-            else if(mode === "RUNNING") modeText.className = "text-2xl bmw-font text-[#ff9b00] mt-1 animate-pulse";
-            else modeText.className = "text-2xl bmw-font text-white mt-1";
+            if(mode === "LOCKED") modeText.className = "text-3xl bmw-font text-red-500 font-bold tracking-wide drop-shadow-[0_0_10px_rgba(239,68,68,0.6)]";
+            else if(mode === "RUNNING") modeText.className = "text-3xl bmw-font text-[#ff9b00] font-bold tracking-wide drop-shadow-[0_0_10px_rgba(255,155,0,0.6)] animate-pulse";
+            else modeText.className = "text-3xl bmw-font text-white font-bold tracking-wide";
 
-            // CORRECCION: Especificar nombre del icono explicito
-            updateIcon('icon-lock', 'fa-lock', data.locked, 'text-red-500');
-            updateIcon('icon-engine', 'fa-power-off', data.run, 'text-[#ff9b00]');
-            updateIcon('icon-acc', 'fa-bolt', data.acc, 'text-blue-400');
-            updateIcon('icon-ign', 'fa-key', data.ign, 'text-green-400');
+            // LOGICA ICONOS CORREGIDA (Basado en el string de modo)
+            const isLocked = mode === "LOCKED";
+            const isAcc = mode === "ACC_ON" || mode === "IGN_ON" || mode === "RUNNING";
+            const isIgn = mode === "IGN_ON" || mode === "RUNNING";
+            const isRun = mode === "RUNNING";
+
+            updateIcon('icon-lock', 'fa-lock', isLocked, 'text-red-500');
+            updateIcon('icon-acc', 'fa-bolt', isAcc, 'text-blue-400');
+            updateIcon('icon-ign', 'fa-key', isIgn, 'text-green-400');
+            updateIcon('icon-engine', 'fa-power-off', isRun, 'text-[#ff9b00]');
 
             if(data.gps && data.gps.includes(",")) {
                 const parts = data.gps.split(",");
@@ -271,12 +516,70 @@
                 const lon = parseFloat(parts[1]);
                 if(!isNaN(lat) && !isNaN(lon)) updateMap(lat, lon);
             }
+
+            // Bateria Avanzada
+            if(data.batt) {
+                const v = parseFloat(data.batt);
+                const battVal = document.getElementById('batt-val');
+                const battBar = document.getElementById('batt-bar');
+                const battStat = document.getElementById('batt-status-text');
+                const battIcon = document.getElementById('batt-icon');
+
+                battVal.innerText = v.toFixed(1) + " V";
+                
+                // Calculo de porcentaje visual (11V = 0%, 14.5V = 100%)
+                let pct = Math.max(0, Math.min(100, (v - 11.0) * (100 / 3.5)));
+                battBar.style.width = pct + "%";
+
+                if(v < 11.5) {
+                    battBar.className = "battery-bar-fill bg-red-600";
+                    battVal.className = "text-sm font-bold text-red-500 bmw-font animate-pulse";
+                    battStat.innerText = "CRÍTICO / BAJA";
+                    battStat.className = "text-[9px] text-red-500 uppercase tracking-wider font-bold";
+                    battIcon.className = "fas fa-car-battery text-red-500 animate-bounce";
+                } else if (v > 13.0) {
+                    battBar.className = "battery-bar-fill bg-green-500";
+                    battVal.className = "text-sm font-bold text-green-400 bmw-font";
+                    battStat.innerText = (v > 14.8) ? "SOBRECARGA" : "CARGANDO (ALT)";
+                    battStat.className = (v > 14.8) ? "text-[9px] text-orange-500 font-bold" : "text-[9px] text-green-500 font-bold";
+                    battIcon.className = "fas fa-car-battery text-green-400";
+                } else {
+                    battBar.className = "battery-bar-fill bg-blue-400";
+                    battVal.className = "text-sm font-bold text-blue-300 bmw-font";
+                    battStat.innerText = "STANDBY / OK";
+                    battStat.className = "text-[9px] text-blue-300 uppercase tracking-wider";
+                    battIcon.className = "fas fa-car-battery text-blue-400";
+                }
+            }
+
+            // Llave Manual (Estilo Interruptor)
+            if(data.chapa) {
+                const keyInd = document.getElementById('key-status-indicator');
+                const keyIcon = document.getElementById('key-icon-inner');
+                const keyText = document.getElementById('key-status-text');
+                
+                if(data.chapa === "ON") {
+                    keyInd.className = "w-10 h-10 rounded-full bg-indigo-900/50 flex items-center justify-center border border-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]";
+                    keyIcon.className = "fas fa-shield-halved text-indigo-400";
+                    keyText.innerText = "HABILITADA";
+                    keyText.className = "text-[9px] text-indigo-400 uppercase tracking-wider font-bold";
+                } else {
+                    keyInd.className = "w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center border border-gray-700";
+                    keyIcon.className = "fas fa-shield-halved text-gray-600";
+                    keyText.innerText = "DESHABILITADA";
+                    keyText.className = "text-[9px] text-gray-600 uppercase tracking-wider";
+                }
+            }
+
+            // Dots de Estado Sistema
+            if(data.gps_st) {
+                document.getElementById('gps-dot').className = (data.gps_st === "ON") ? "w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e]" : "w-1.5 h-1.5 rounded-full bg-gray-600";
+            }
         }
 
         function updateIcon(id, iconName, isActive, activeClass) {
             const el = document.getElementById(id);
-            // CORRECCION: Usar iconName en lugar de id.replace
-            if(isActive) el.className = `fas ${iconName} text-xl ${activeClass} drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]`;
+            if(isActive) el.className = `fas ${iconName} text-xl ${activeClass} drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]`;
             else el.className = `fas ${iconName} text-xl text-gray-700`;
         }
     </script>
