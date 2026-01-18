@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BMW E36 Security System V3.4</title>
+    <title>BMW E36 Security V4.5</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <!-- Leaflet para Mapas -->
@@ -17,16 +17,14 @@
         body { font-family: 'Roboto', sans-serif; background-color: #080808; color: #e0e0e0; }
         .bmw-font { font-family: 'Orbitron', sans-serif; }
         
-        /* Efecto Vidrio / Cards */
         .glass-panel {
             background: rgba(20, 20, 20, 0.7);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
         }
 
-        /* Botones Neumórficos Oscuros */
         .btn-control {
             background: linear-gradient(145deg, #161616, #0f0f0f);
             border: 1px solid #222;
@@ -37,8 +35,7 @@
             box-shadow: inset 4px 4px 8px #050505, inset -4px -4px 8px #1f1f1f;
             transform: scale(0.98);
         }
-
-        /* Botón Reset (Estilo Mantenimiento) */
+        
         .btn-reset {
             background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
             border: 1px solid #333;
@@ -50,52 +47,53 @@
             color: #fff;
         }
         
-        /* Mapa oscuro */
+        #full-map { height: 100%; width: 100%; z-index: 0; }
         .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out, .leaflet-control-attribution { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
-        #map { height: 180px; width: 100%; border-radius: 0.75rem; z-index: 0; }
-
-        /* Login */
+        
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            transition: transform 0.3s ease-in-out;
+            overflow-y: auto;
+            background-color: #080808;
+            padding-bottom: 80px; /* Espacio para scroll */
+        }
+        .screen.hidden-right { transform: translateX(100%); }
+        
         #login-screen {
             background-image: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.95)), url('https://images.unsplash.com/photo-1616455579100-2ceaa4eb2d37?q=80&w=1000&auto=format&fit=crop');
-            background-size: cover; background-position: center;
+            background-size: cover; background-position: center; z-index: 2000;
         }
 
-        /* Barra de progreso Bateria */
         .battery-bar-bg { background: #333; height: 6px; border-radius: 3px; overflow: hidden; }
         .battery-bar-fill { height: 100%; transition: width 0.5s ease, background-color 0.5s ease; }
 
-        /* Notificación Toast */
+        /* Toast CSS Standard */
         #toast-notification {
             transform: translateY(-150%);
             transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
         }
-        #toast-notification.show {
-            transform: translateY(0);
-        }
-        /* Tipo de Alerta Dinamico */
-        .toast-success { border-left-color: #3b82f6; } /* Azul */
-        .toast-success .icon-bg { background: rgba(59, 130, 246, 0.2); }
+        #toast-notification.show { transform: translateY(0); }
+        
+        .toast-success { border-left-color: #3b82f6; }
         .toast-success i { color: #3b82f6; }
-        .toast-success h4 { color: #3b82f6; }
-
-        .toast-danger { border-left-color: #ef4444; } /* Rojo */
-        .toast-danger .icon-bg { background: rgba(239, 68, 68, 0.2); }
+        .toast-danger { border-left-color: #ef4444; }
         .toast-danger i { color: #ef4444; }
-        .toast-danger h4 { color: #ef4444; }
-
-        .toast-info { border-left-color: #f59e0b; } /* Naranja/Amarillo */
-        .toast-info .icon-bg { background: rgba(245, 158, 11, 0.2); }
+        .toast-info { border-left-color: #f59e0b; }
         .toast-info i { color: #f59e0b; }
-        .toast-info h4 { color: #f59e0b; }
+
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: #1a1a1a; color: white; border: 1px solid #333;
+        }
+        .leaflet-popup-content { margin: 10px; font-size: 11px; }
 
         ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
-<body class="h-screen w-screen overflow-hidden select-none flex flex-col relative">
+<body class="h-screen w-screen overflow-hidden select-none relative bg-black">
 
-    <!-- TOAST NOTIFICATION (ALERTA) -->
-    <div id="toast-notification" class="absolute top-4 left-4 right-4 z-[1000] glass-panel rounded-xl p-4 border-l-4 flex items-center gap-4 shadow-2xl toast-success">
-        <div class="w-10 h-10 rounded-full icon-bg flex items-center justify-center shrink-0">
+    <!-- TOAST -->
+    <div id="toast-notification" class="absolute top-4 left-4 right-4 z-[3000] glass-panel rounded-xl p-4 border-l-4 flex items-center gap-4 shadow-2xl toast-success">
+        <div class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center shrink-0">
             <i id="toast-icon" class="fas fa-face-smile text-xl"></i>
         </div>
         <div>
@@ -104,34 +102,28 @@
         </div>
     </div>
 
-    <!-- LOGIN SCREEN -->
-    <div id="login-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center text-center p-6 transition-opacity duration-700">
+    <!-- LOGIN -->
+    <div id="login-screen" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 transition-opacity duration-700">
         <div class="mb-8 animate-pulse">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/2048px-BMW.svg.png" alt="BMW Logo" class="w-24 h-24 mx-auto mb-4 drop-shadow-2xl">
         </div>
         <h1 class="text-3xl font-bold text-white mb-2 bmw-font tracking-wider">BMW E36</h1>
-        <p class="text-gray-400 text-sm mb-8 tracking-[0.2em]">SECURITY SYSTEM V3.4</p>
-        
+        <p class="text-gray-400 text-sm mb-8 tracking-[0.2em]">CONNECTED DRIVE V4.5</p>
         <div class="w-full max-w-xs space-y-4">
             <input type="password" id="pin-code" placeholder="ACCESS CODE" class="w-full bg-white/5 border border-white/10 rounded-full px-6 py-4 text-center text-white placeholder-gray-500 focus:outline-none focus:border-[#ff9b00] font-mono text-xl tracking-widest transition-colors">
-            <button onclick="attemptLogin()" class="w-full bg-[#ff9b00] hover:bg-[#e68a00] text-black font-bold py-4 rounded-full shadow-lg shadow-orange-900/20 transform active:scale-95 transition-all tracking-wider">
-                UNLOCK SYSTEM
-            </button>
+            <button onclick="attemptLogin()" class="w-full bg-[#ff9b00] hover:bg-[#e68a00] text-black font-bold py-4 rounded-full shadow-lg transform active:scale-95 transition-all tracking-wider">UNLOCK SYSTEM</button>
         </div>
         <p id="login-error" class="text-red-500 mt-4 hidden text-xs uppercase tracking-widest">Access Denied</p>
     </div>
 
-    <!-- MAIN APP -->
-    <div id="main-app" class="hidden h-full flex flex-col p-4 max-w-md mx-auto w-full relative overflow-y-auto pb-24">
-        
+    <!-- PANTALLA 1: DASHBOARD PRINCIPAL -->
+    <div id="dashboard-screen" class="screen flex flex-col p-4">
         <!-- Header -->
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex justify-between items-center mb-6 shrink-0">
             <div class="flex items-center gap-3">
                 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/1024px-BMW.svg.png" class="w-8 h-8 drop-shadow-md">
-                <div>
-                    <div id="connection-status" class="text-[10px] text-gray-500 flex items-center gap-1.5 uppercase font-bold tracking-wider bg-white/5 px-2 py-1 rounded-full">
-                        <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> Offline
-                    </div>
+                <div id="connection-status" class="text-[10px] text-gray-500 flex items-center gap-1.5 uppercase font-bold tracking-wider bg-white/5 px-2 py-1 rounded-full">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> Offline
                 </div>
             </div>
             <div class="text-right">
@@ -139,7 +131,7 @@
             </div>
         </div>
 
-        <!-- Dashboard Principal -->
+        <!-- Dashboard Status -->
         <div class="glass-panel rounded-3xl p-5 mb-5 relative overflow-hidden shrink-0">
             <div class="absolute -right-4 -top-4 w-32 h-32 bg-blue-900/20 rounded-full blur-3xl"></div>
             <div class="absolute -left-4 -bottom-4 w-32 h-32 bg-red-900/10 rounded-full blur-3xl"></div>
@@ -188,44 +180,55 @@
             </div>
         </div>
 
-        <!-- Botones de Acción -->
+        <!-- Botón Grande MAPA -->
+        <button onclick="showMapScreen()" class="glass-panel w-full p-4 rounded-2xl mb-6 flex items-center justify-between group active:bg-white/5 transition-all border border-blue-500/30">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-blue-900/30 flex items-center justify-center">
+                    <i class="fas fa-map-location-dot text-2xl text-blue-400"></i>
+                </div>
+                <div class="text-left">
+                    <div class="text-sm font-bold text-white tracking-wide">MAPA Y RASTREO GPS</div>
+                    <div class="text-[10px] text-gray-400">Ver ubicación en tiempo real e historial</div>
+                </div>
+            </div>
+            <i class="fas fa-chevron-right text-gray-500 group-active:translate-x-1 transition-transform"></i>
+        </button>
+
+        <!-- Botones Control -->
         <div class="grid grid-cols-2 gap-3 mb-6 shrink-0">
             <button onclick="sendCommand('DESBLOQUEAR')" class="btn-control rounded-2xl p-4 flex flex-col items-center gap-2 group active:border-blue-500/50">
-                <div class="w-10 h-10 rounded-full bg-blue-900/20 flex items-center justify-center group-active:bg-blue-500/20 transition-colors">
+                <div class="w-10 h-10 rounded-full bg-blue-900/20 flex items-center justify-center">
                     <i class="fas fa-unlock text-xl text-blue-400"></i>
                 </div>
-                <span class="text-[10px] font-bold text-gray-300 tracking-wider">UNLOCK / ACC</span>
+                <span class="text-[10px] font-bold text-gray-300 tracking-wider">UNLOCK</span>
             </button>
-            
             <button onclick="sendCommand('BLOQUEAR')" class="btn-control rounded-2xl p-4 flex flex-col items-center gap-2 group active:border-red-500/50">
-                <div class="w-10 h-10 rounded-full bg-red-900/20 flex items-center justify-center group-active:bg-red-500/20 transition-colors">
+                <div class="w-10 h-10 rounded-full bg-red-900/20 flex items-center justify-center">
                     <i class="fas fa-lock text-xl text-red-500"></i>
                 </div>
                 <span class="text-[10px] font-bold text-gray-300 tracking-wider">LOCK</span>
             </button>
-            
             <button onclick="sendCommand('IGNICION')" class="btn-control rounded-2xl p-4 flex flex-col items-center gap-2 group active:border-green-500/50">
-                <div class="w-10 h-10 rounded-full bg-green-900/20 flex items-center justify-center group-active:bg-green-500/20 transition-colors">
+                <div class="w-10 h-10 rounded-full bg-green-900/20 flex items-center justify-center">
                     <i class="fas fa-key text-xl text-green-400"></i>
                 </div>
                 <span class="text-[10px] font-bold text-gray-300 tracking-wider">IGNITION</span>
             </button>
-            
-            <button onclick="sendCommandWithConfirm('ARRANCAR', '¿CONFIRMAR ARRANQUE DE MOTOR?')" class="btn-control rounded-2xl p-4 flex flex-col items-center gap-2 border border-[#ff9b00]/30 active:bg-[#ff9b00]/10">
-                <div class="w-10 h-10 rounded-full bg-orange-900/20 flex items-center justify-center group-active:bg-orange-500/20 transition-colors shadow-[0_0_10px_rgba(255,155,0,0.2)]">
+            <button onclick="sendCommandWithConfirm('ARRANCAR', '¿CONFIRMAR ARRANQUE?')" class="btn-control rounded-2xl p-4 flex flex-col items-center gap-2 border border-[#ff9b00]/30 active:bg-[#ff9b00]/10">
+                <div class="w-10 h-10 rounded-full bg-orange-900/20 flex items-center justify-center shadow-[0_0_10px_rgba(255,155,0,0.2)]">
                     <i class="fas fa-bolt text-xl text-[#ff9b00]"></i>
                 </div>
-                <span class="text-[10px] font-bold text-[#ff9b00] tracking-wider">START ENGINE</span>
+                <span class="text-[10px] font-bold text-[#ff9b00] tracking-wider">START</span>
             </button>
         </div>
 
-        <!-- Panel Llave Manual -->
+        <!-- Llave Manual -->
         <div class="mb-6">
             <h3 class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 pl-1">Control Físico (Llave)</h3>
             <div class="glass-panel rounded-2xl p-4 flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <div id="key-status-indicator" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center border border-gray-700 transition-all duration-300">
-                        <i class="fas fa-shield-halved text-gray-500 transition-colors duration-300" id="key-icon-inner"></i>
+                    <div id="key-status-indicator" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center border border-gray-700">
+                        <i class="fas fa-shield-halved text-gray-500" id="key-icon-inner"></i>
                     </div>
                     <div>
                         <div class="text-xs font-bold text-white tracking-wide">LLAVE MANUAL</div>
@@ -233,15 +236,15 @@
                     </div>
                 </div>
                 <div class="flex gap-2">
-                    <button onclick="sendCommandWithConfirm('ENABLE_KEY_LOGIC', '¿Habilitar uso de llave física?')" class="bg-gray-800 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-[10px] font-bold border border-gray-700 transition-all active:scale-95">ON</button>
-                    <button onclick="sendCommandWithConfirm('DISABLE_KEY_LOGIC', '¿Deshabilitar llave física?')" class="bg-gray-800 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-[10px] font-bold border border-gray-700 transition-all active:scale-95">OFF</button>
+                    <button onclick="sendCommandWithConfirm('ENABLE_KEY_LOGIC', '¿Habilitar llave física?')" class="bg-gray-800 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-[10px] font-bold border border-gray-700">ON</button>
+                    <button onclick="sendCommandWithConfirm('DISABLE_KEY_LOGIC', '¿Deshabilitar llave física?')" class="bg-gray-800 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-[10px] font-bold border border-gray-700">OFF</button>
                 </div>
             </div>
         </div>
 
-        <!-- Controles Sistemas -->
+        <!-- Sistemas -->
         <div class="mb-6">
-            <h3 class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 pl-1">Sistemas & Conectividad</h3>
+            <h3 class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 pl-1">Sistemas</h3>
             <div class="grid grid-cols-3 gap-3">
                 <div class="glass-panel rounded-xl p-3 flex flex-col items-center gap-2">
                     <div class="flex justify-between w-full items-start">
@@ -254,7 +257,6 @@
                         <button onclick="sendCommand('CMD_WIFI_OFF')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-red-400">OFF</button>
                     </div>
                 </div>
-
                 <div class="glass-panel rounded-xl p-3 flex flex-col items-center gap-2">
                     <div class="flex justify-between w-full items-start">
                         <i class="fas fa-satellite-dish text-sm text-gray-400"></i>
@@ -266,7 +268,6 @@
                         <button onclick="sendCommand('CMD_GPS_OFF')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-red-400">OFF</button>
                     </div>
                 </div>
-
                 <div class="glass-panel rounded-xl p-3 flex flex-col items-center gap-2">
                     <div class="flex justify-between w-full items-start">
                         <i class="fas fa-tv text-sm text-gray-400"></i>
@@ -281,55 +282,68 @@
             </div>
         </div>
 
-        <!-- NUEVA SECCION: Mantenimiento / Recuperación -->
+        <!-- Mantenimiento -->
         <div class="mb-6">
-            <h3 class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 pl-1">Recuperación de Fallos</h3>
+            <h3 class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 pl-1">Recuperación</h3>
             <div class="grid grid-cols-3 gap-3">
-                <button onclick="sendCommandWithConfirm('ENABLE_CAM', '¿Reiniciar conexión con Cámara?')" class="btn-reset rounded-xl p-3 flex flex-col items-center justify-center gap-1 active:border-blue-500">
-                    <i class="fas fa-video-slash text-gray-400 mb-1"></i>
-                    <span class="text-[8px] font-bold uppercase tracking-wide">RESET CAM</span>
+                <button onclick="sendCommandWithConfirm('ENABLE_CAM', '¿Reiniciar Cámara?')" class="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center gap-1 active:bg-white/10">
+                    <i class="fas fa-video-slash text-gray-400"></i>
+                    <span class="text-[7px] text-gray-400">RESET CAM</span>
                 </button>
-                <button onclick="sendCommandWithConfirm('ENABLE_FINGER', '¿Reiniciar sensor de Huella?')" class="btn-reset rounded-xl p-3 flex flex-col items-center justify-center gap-1 active:border-purple-500">
-                    <i class="fas fa-fingerprint text-gray-400 mb-1"></i>
-                    <span class="text-[8px] font-bold uppercase tracking-wide">RESET HUELLA</span>
+                <button onclick="sendCommandWithConfirm('ENABLE_FINGER', '¿Reiniciar Huella?')" class="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center gap-1 active:bg-white/10">
+                    <i class="fas fa-fingerprint text-gray-400"></i>
+                    <span class="text-[7px] text-gray-400">RESET FP</span>
                 </button>
-                <button onclick="sendCommandWithConfirm('DISPLAY_ON_ALL', '¿Reiniciar Pantallas (I2C)?')" class="btn-reset rounded-xl p-3 flex flex-col items-center justify-center gap-1 active:border-blue-400">
-                    <i class="fas fa-tv text-gray-400 mb-1"></i>
-                    <span class="text-[8px] font-bold uppercase tracking-wide">RESET DISP</span>
+                <button onclick="sendCommandWithConfirm('DISPLAY_ON_ALL', '¿Reiniciar Displays?')" class="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center gap-1 active:bg-white/10">
+                    <i class="fas fa-tv text-gray-400"></i>
+                    <span class="text-[7px] text-gray-400">RESET LCD</span>
                 </button>
             </div>
         </div>
 
-        <!-- Mapa -->
-        <div class="glass-panel rounded-xl p-1 mb-6 shrink-0 relative border border-gray-800">
-            <div id="map"></div>
-            <div class="absolute bottom-2 left-2 bg-black/80 backdrop-blur-sm px-2 py-1 rounded text-[9px] text-white z-[400] border border-white/10">
-                <i class="fas fa-location-arrow text-blue-400 mr-1"></i> <span id="gps-coords-text">Esperando señal...</span>
-            </div>
-            <div class="absolute top-2 right-2 z-[400] flex flex-col gap-1">
-                 <button onclick="sendCommand('GET_HISTORY_LAST_50')" class="bg-black/80 text-white w-7 h-7 rounded flex items-center justify-center hover:bg-blue-600 transition-colors"><i class="fas fa-history text-xs"></i></button>
-                 <button onclick="clearMapHistory()" class="bg-black/80 text-white w-7 h-7 rounded flex items-center justify-center hover:bg-red-600 transition-colors"><i class="fas fa-trash text-xs"></i></button>
-            </div>
+        <!-- Kill Switch -->
+        <div class="pb-6">
+             <button onclick="sendCommandWithConfirm('APAGAR', '¡ADVERTENCIA! ¿CORTAR ENCENDIDO?')" class="w-full bg-gradient-to-br from-red-900 to-red-950 rounded-xl p-3 flex items-center justify-center gap-2 border border-red-800 shadow-[0_0_15px_rgba(255,0,0,0.2)] active:scale-95 transition-all">
+                <i class="fas fa-stop-circle text-white text-lg"></i> 
+                <span class="text-xs font-bold text-white tracking-widest">KILL SWITCH - CORTE EMERGENCIA</span>
+            </button>
         </div>
+    </div>
 
-        <!-- Extras -->
-        <div class="grid grid-cols-2 gap-3 pb-4">
-             <button onclick="sendCommandWithConfirm('ABRIR_PUERTA', '¿Abrir seguros?')" class="btn-control rounded-xl p-3 flex flex-col items-center justify-center gap-1 border-b-2 border-b-blue-900 active:border-b-0 translate-y-0 active:translate-y-0.5 transition-all">
-                <i class="fas fa-door-open text-blue-400 text-lg"></i> 
-                <span class="text-[9px] font-bold text-gray-400">PUERTAS</span>
+    <!-- PANTALLA 2: MAPA FULL SCREEN -->
+    <div id="map-screen" class="screen hidden-right flex flex-col relative bg-[#111]">
+        <!-- Header Mapa -->
+        <div class="absolute top-0 left-0 right-0 z-[1001] p-4 bg-gradient-to-b from-black/90 to-transparent pointer-events-none flex justify-between items-start">
+            <button onclick="hideMapScreen()" class="pointer-events-auto bg-black/60 backdrop-blur-md w-10 h-10 rounded-full flex items-center justify-center border border-white/10 text-white shadow-lg active:scale-95 transition-transform">
+                <i class="fas fa-arrow-left"></i>
             </button>
             
-             <button onclick="registrarHuella()" class="btn-control rounded-xl p-3 flex flex-col items-center justify-center gap-1 border-b-2 border-b-purple-900 active:border-b-0 translate-y-0 active:translate-y-0.5 transition-all">
-                <i class="fas fa-fingerprint text-purple-400 text-lg"></i> 
-                <span class="text-[9px] font-bold text-gray-400">REG. HUELLA</span>
-            </button>
+            <div class="pointer-events-auto flex flex-col gap-2">
+                 <div class="glass-panel px-3 py-2 rounded-lg flex items-center gap-2 border border-white/10 shadow-lg">
+                    <i class="fas fa-satellite text-blue-400 text-xs"></i>
+                    <span id="map-coords" class="text-[10px] text-white font-mono">Esperando...</span>
+                 </div>
+            </div>
+        </div>
 
-             <button onclick="sendCommandWithConfirm('APAGAR', '¡ADVERTENCIA! ¿CORTAR ENCENDIDO?')" class="bg-gradient-to-br from-red-900 to-red-950 rounded-xl p-3 flex flex-col items-center justify-center gap-1 border border-red-800 shadow-[0_0_10px_rgba(255,0,0,0.1)] active:scale-95 transition-all col-span-2 mt-2">
-                <i class="fas fa-stop-circle text-white text-lg drop-shadow-md"></i> 
-                <span class="text-[9px] font-bold text-white tracking-widest">KILL SWITCH - CORTE DE EMERGENCIA</span>
+        <!-- Controles Mapa Flotantes -->
+        <div class="absolute bottom-6 left-4 right-4 z-[1001] flex flex-col gap-3 pointer-events-none">
+            <!-- Botones Historial -->
+            <div class="grid grid-cols-2 gap-3 pointer-events-auto">
+                <button onclick="sendCommand('GET_HISTORY_LAST_50')" class="bg-black/70 backdrop-blur-md border border-white/20 text-white py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 active:bg-blue-900/50">
+                    <i class="fas fa-clock-rotate-left text-blue-400"></i> ÚLTIMOS 50
+                </button>
+                <button onclick="sendCommand('GET_HISTORY_ALL')" class="bg-black/70 backdrop-blur-md border border-white/20 text-white py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 active:bg-purple-900/50">
+                    <i class="fas fa-route text-purple-400"></i> RECORRIDO TOTAL
+                </button>
+            </div>
+             <button onclick="clearMapHistory()" class="pointer-events-auto w-full bg-red-900/80 backdrop-blur-md border border-red-500/30 text-white py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 active:bg-red-800">
+                <i class="fas fa-trash"></i> LIMPIAR MAPA
             </button>
         </div>
 
+        <!-- El Mapa -->
+        <div id="full-map"></div>
     </div>
 
     <script>
@@ -343,74 +357,164 @@
         let client;
         let map, marker, polyline;
         let pathCoords = [];
+        let isMapInit = false;
+        let historyLayerGroup; 
 
         function attemptLogin() {
             const pin = document.getElementById('pin-code').value;
             if(pin === "1234" || pin === "") {
                 document.getElementById('login-screen').style.opacity = '0';
+                
+                // --- CAMBIO CLAVE V4.5: INICIAR CONEXION ANTES QUE EL MAPA ---
+                connectMQTT(); // Conectar MQTT primero
+
                 setTimeout(() => {
                     document.getElementById('login-screen').classList.add('hidden');
                     document.getElementById('main-app').classList.remove('hidden');
-                    initMap();
-                    connectMQTT();
+                    
+                    // Inicializar mapa de forma segura
+                    try {
+                       initFullMap();
+                    } catch(e) {
+                       console.error("Mapa Error:", e);
+                    }
                 }, 700);
             } else {
                 document.getElementById('login-error').classList.remove('hidden');
             }
         }
 
-        function initMap() {
-            map = L.map('map').setView([-16.5000, -68.1500], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap',
-                maxZoom: 19
-            }).addTo(map);
+        // --- NAVEGACIÓN PANTALLAS ---
+        function showMapScreen() {
+            const dashboard = document.getElementById('dashboard-screen');
+            const mapScreen = document.getElementById('map-screen');
             
-            const icon = L.icon({ 
+            // Animación
+            dashboard.style.transform = "translateX(-30%)";
+            dashboard.style.opacity = "0";
+            mapScreen.classList.remove('hidden-right');
+            
+            if(!isMapInit) {
+                // Si no se inició al login, intentar de nuevo
+                setTimeout(initFullMap, 300);
+            } else {
+                setTimeout(() => { if(map) map.invalidateSize(); }, 300);
+            }
+        }
+
+        function hideMapScreen() {
+            const dashboard = document.getElementById('dashboard-screen');
+            const mapScreen = document.getElementById('map-screen');
+            
+            dashboard.style.transform = "translateX(0)";
+            dashboard.style.opacity = "1";
+            mapScreen.classList.add('hidden-right');
+        }
+
+        // --- MAPA LEAFLET ---
+        function initFullMap() {
+            if(map || isMapInit) return; 
+            
+            map = L.map('full-map', { zoomControl: false }).setView([-16.5000, -68.1500], 15);
+            
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                maxZoom: 20
+            }).addTo(map);
+
+            const carIcon = L.icon({ 
                 iconUrl: 'https://cdn-icons-png.flaticon.com/512/3097/3097180.png', 
-                iconSize: [35, 35], 
-                iconAnchor: [17, 17] 
+                iconSize: [40, 40], iconAnchor: [20, 20] 
             });
-            marker = L.marker([-16.5000, -68.1500], {icon: icon}).addTo(map);
-            polyline = L.polyline([], {color: '#ff9b00', weight: 4}).addTo(map);
+            marker = L.marker([-16.5000, -68.1500], {icon: carIcon, zIndexOffset: 1000}).addTo(map);
+
+            polyline = L.polyline([], {
+                color: '#ff9b00', 
+                weight: 4, 
+                dashArray: '10, 10', 
+                opacity: 0.8
+            }).addTo(map);
+
+            historyLayerGroup = L.layerGroup().addTo(map);
+            isMapInit = true;
         }
 
         function updateMap(lat, lon) {
-            if(!map || !marker) return;
+            if(!map) return;
             const newLatLng = new L.LatLng(lat, lon);
             marker.setLatLng(newLatLng);
-            map.panTo(newLatLng);
-            document.getElementById('gps-coords-text').innerText = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+            // Solo centrar si no estamos viendo historial activamente
+            if(pathCoords.length === 0) map.panTo(newLatLng);
+            
+            document.getElementById('map-coords').innerText = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
         }
 
-        function addToHistory(lat, lon) {
+        function addToHistory(lat, lon, timestamp) {
             if(!map) return;
-            pathCoords.push([lat, lon]);
+            
+            const latlng = [lat, lon];
+            pathCoords.push(latlng);
             polyline.setLatLngs(pathCoords);
+
+            const dateObj = new Date(timestamp * 1000);
+            // *** CORRECCIÓN ZONA HORARIA ***
+            // Como el ESP32 ya mandó la hora corregida (ej: UTC -4), mostramos la hora UTC directa
+            // para que el navegador no intente restarle otras 4 horas.
+            const dateStr = dateObj.getUTCDate() + "/" + (dateObj.getUTCMonth()+1) + "/" + dateObj.getUTCFullYear() + " " + 
+                            dateObj.getUTCHours().toString().padStart(2, '0') + ":" + 
+                            dateObj.getUTCMinutes().toString().padStart(2, '0') + ":" + 
+                            dateObj.getUTCSeconds().toString().padStart(2, '0');
+
+            const pointMarker = L.circleMarker(latlng, {
+                radius: 6, fillColor: "#ff9b00", color: "#fff", weight: 1, opacity: 1, fillOpacity: 0.8
+            });
+
+            pointMarker.bindPopup(`
+                <div class="text-center">
+                    <div class="text-xs text-gray-400 font-bold mb-1">REGISTRO HISTÓRICO</div>
+                    <div class="text-sm font-bold text-white">${dateStr}</div>
+                    <div class="text-[10px] text-blue-400 mt-1">${lat.toFixed(5)}, ${lon.toFixed(5)}</div>
+                </div>
+            `);
+
+            historyLayerGroup.addLayer(pointMarker);
+
             if(pathCoords.length > 1) {
-                map.fitBounds(polyline.getBounds());
+                map.fitBounds(polyline.getBounds(), {padding: [50, 50]});
             } else {
-                map.panTo([lat, lon]);
+                map.panTo(latlng);
             }
         }
 
         function clearMapHistory() {
             pathCoords = [];
             if(polyline) polyline.setLatLngs([]);
-            sendCommand("CLEAR_HISTORY");
+            if(historyLayerGroup) historyLayerGroup.clearLayers();
+            showNotification("MAPA LIMPIO", "Visualización reseteada", 'info');
         }
 
+        // --- MQTT CONFIGURACIÓN (RESTAURADA V3.4) ---
         function connectMQTT() {
+            // Feedback Visual Inmediato
+            const st = document.getElementById('connection-status');
+            st.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></span> CONECTANDO...';
+            st.classList.remove('text-red-500'); st.classList.add('text-yellow-500');
+
             console.log("Conectando...");
+            // Constructor V3.4 (Sin path extra)
             client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID);
             client.onConnectionLost = onConnectionLost;
             client.onMessageArrived = onMessageArrived;
 
             const options = {
-                useSSL: true, timeout: 3, onSuccess: onConnect,
+                useSSL: true, 
+                timeout: 3,
+                onSuccess: onConnect,
                 onFailure: (e) => {
                     console.log("Fallo MQTT", e);
-                    document.getElementById('connection-status').innerText = "RETRYING...";
+                    const st = document.getElementById('connection-status');
+                    st.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> RETRYING';
+                    st.classList.remove('text-yellow-500'); st.classList.add('text-red-500');
                     setTimeout(connectMQTT, 5000);
                 }
             };
@@ -421,7 +525,7 @@
             console.log("MQTT Online");
             const st = document.getElementById('connection-status');
             st.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e]"></span> ONLINE';
-            st.classList.remove('text-red-500'); st.classList.add('text-green-500');
+            st.classList.remove('text-yellow-500'); st.classList.add('text-green-500');
             client.subscribe(TOPIC_SUB_STATUS);
             client.subscribe(TOPIC_SUB_HIST);
             sendCommand("GET_STATUS");
@@ -430,8 +534,8 @@
         function onConnectionLost(responseObject) {
             if (responseObject.errorCode !== 0) {
                 const st = document.getElementById('connection-status');
-                st.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> RECONNECTING';
-                st.classList.add('text-red-500'); st.classList.remove('text-green-500');
+                st.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> RECONNECT';
+                st.classList.remove('text-green-500'); st.classList.add('text-red-500');
                 setTimeout(connectMQTT, 5000);
             }
         }
@@ -443,14 +547,9 @@
             client.send(message);
             if(navigator.vibrate) navigator.vibrate(30);
         }
-
-        function sendCommandWithConfirm(cmd, text) {
-            if(confirm(text)) sendCommand(cmd);
-        }
-
-        function registrarHuella() {
-            if(confirm("MODO REGISTRO HUELLA: Siga instrucciones en pantalla OLED.")) sendCommand('NUEVA_HUELLA');
-        }
+        
+        function sendCommandWithConfirm(cmd, text) { if(confirm(text)) sendCommand(cmd); }
+        function registrarHuella() { if(confirm("¿Iniciar registro de huella?")) sendCommand('NUEVA_HUELLA'); }
 
         function showNotification(title, message, type = 'info') {
             const toast = document.getElementById('toast-notification');
@@ -458,25 +557,13 @@
             const titleEl = document.getElementById('toast-title');
             const iconEl = document.getElementById('toast-icon');
             
-            toast.className = 'absolute top-4 left-4 right-4 z-[1000] glass-panel rounded-xl p-4 border-l-4 flex items-center gap-4 shadow-2xl';
-            
-            if (type === 'error') {
-                toast.classList.add('toast-danger');
-                iconEl.className = "fas fa-triangle-exclamation text-xl";
-            } else if (type === 'success') {
-                toast.classList.add('toast-success');
-                iconEl.className = "fas fa-face-smile text-xl";
-            } else { 
-                toast.classList.add('toast-info');
-                iconEl.className = "fas fa-circle-info text-xl";
-            }
+            toast.className = 'absolute top-4 left-4 right-4 z-[3000] glass-panel rounded-xl p-4 border-l-4 flex items-center gap-4 shadow-2xl';
+            if (type === 'error') { toast.classList.add('toast-danger'); iconEl.className = "fas fa-triangle-exclamation text-xl"; } 
+            else if (type === 'success') { toast.classList.add('toast-success'); iconEl.className = "fas fa-face-smile text-xl"; } 
+            else { toast.classList.add('toast-info'); iconEl.className = "fas fa-circle-info text-xl"; }
 
-            titleEl.innerText = title;
-            msgEl.innerText = message;
+            titleEl.innerText = title; msgEl.innerText = message;
             toast.classList.add('show');
-            
-            if(navigator.vibrate) navigator.vibrate(type === 'error' ? [200, 100, 200] : [100]);
-
             setTimeout(() => { toast.classList.remove('show'); }, 4000);
         }
 
@@ -487,43 +574,33 @@
 
                 if (message.destinationName === TOPIC_SUB_STATUS) {
                     if(data.alert) {
-                        if(data.alert === "FACE_UNLOCK") {
-                            showNotification("ACCESO CONCEDIDO", "Rostro: " + (data.user || "Usuario"), 'success');
-                        } else if(data.alert === "INFO") {
-                            showNotification("INFORMACIÓN", data.msg, 'info');
-                        } else if(data.alert === "CAM_FAIL" || data.alert === "FINGER_FAIL" || data.alert === "DISPLAY_FAIL") {
-                            showNotification("FALLO SISTEMA", data.msg, 'error');
-                        } else {
-                            showNotification("ALERTA", data.msg || data.alert, 'error');
-                        }
+                        if(data.alert === "FACE_UNLOCK") showNotification("ACCESO CONCEDIDO", "Usuario: " + (data.user || "?"), 'success');
+                        else if(data.alert === "INFO") showNotification("INFO", data.msg, 'info');
+                        else showNotification("ALERTA", data.msg || data.alert, 'error');
                     } else {
                         updateDashboard(data);
                     }
                 }
                 else if (message.destinationName === TOPIC_SUB_HIST) {
-                    if(data.lat && data.lon) addToHistory(data.lat, data.lon);
+                    if(data.lat && data.lon && data.t) {
+                        addToHistory(data.lat, data.lon, data.t);
+                    }
                 }
             } catch (e) { console.error("Error JSON", e); }
         }
 
         function updateDashboard(data) {
             const modeText = document.getElementById('vehicle-mode');
-            const mode = data.mode || "UNKNOWN";
-            modeText.innerText = mode;
+            modeText.innerText = data.mode || "UNKNOWN";
             
-            if(mode === "LOCKED") modeText.className = "text-3xl bmw-font text-red-500 font-bold tracking-wide drop-shadow-[0_0_10px_rgba(239,68,68,0.6)]";
-            else if(mode === "RUNNING") modeText.className = "text-3xl bmw-font text-[#ff9b00] font-bold tracking-wide drop-shadow-[0_0_10px_rgba(255,155,0,0.6)] animate-pulse";
-            else modeText.className = "text-3xl bmw-font text-white font-bold tracking-wide";
+            if(data.mode === "LOCKED") modeText.className = "text-3xl bmw-font text-red-500 font-bold drop-shadow-[0_0_10px_rgba(239,68,68,0.6)]";
+            else if(data.mode === "RUNNING") modeText.className = "text-3xl bmw-font text-[#ff9b00] font-bold drop-shadow-[0_0_10px_rgba(255,155,0,0.6)] animate-pulse";
+            else modeText.className = "text-3xl bmw-font text-white font-bold";
 
-            const isLocked = mode === "LOCKED";
-            const isAcc = mode === "ACC_ON" || mode === "IGN_ON" || mode === "RUNNING";
-            const isIgn = mode === "IGN_ON" || mode === "RUNNING";
-            const isRun = mode === "RUNNING";
-
-            updateIcon('icon-lock', 'fa-lock', isLocked, 'text-red-500');
-            updateIcon('icon-acc', 'fa-bolt', isAcc, 'text-blue-400');
-            updateIcon('icon-ign', 'fa-key', isIgn, 'text-green-400');
-            updateIcon('icon-engine', 'fa-power-off', isRun, 'text-[#ff9b00]');
+            updateIcon('icon-lock', 'fa-lock', data.mode === "LOCKED", 'text-red-500');
+            updateIcon('icon-acc', 'fa-bolt', (data.mode === "ACC_ON" || data.mode === "IGN_ON" || data.mode === "RUNNING"), 'text-blue-400');
+            updateIcon('icon-ign', 'fa-key', (data.mode === "IGN_ON" || data.mode === "RUNNING"), 'text-green-400');
+            updateIcon('icon-engine', 'fa-power-off', data.mode === "RUNNING", 'text-[#ff9b00]');
 
             if(data.gps && data.gps.includes(",")) {
                 const parts = data.gps.split(",");
@@ -532,7 +609,7 @@
                 if(!isNaN(lat) && !isNaN(lon)) updateMap(lat, lon);
             }
 
-            if(data.batt) {
+             if(data.batt) {
                 const v = parseFloat(data.batt);
                 const battVal = document.getElementById('batt-val');
                 const battBar = document.getElementById('batt-bar');
@@ -568,7 +645,6 @@
                 const keyInd = document.getElementById('key-status-indicator');
                 const keyIcon = document.getElementById('key-icon-inner');
                 const keyText = document.getElementById('key-status-text');
-                
                 if(data.chapa === "ON") {
                     keyInd.className = "w-10 h-10 rounded-full bg-indigo-900/50 flex items-center justify-center border border-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]";
                     keyIcon.className = "fas fa-shield-halved text-indigo-400";
@@ -581,9 +657,9 @@
                     keyText.className = "text-[9px] text-gray-600";
                 }
             }
-
+            
             if(data.gps_st) {
-                document.getElementById('gps-dot').className = (data.gps_st === "ON") ? "w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e]" : "w-1.5 h-1.5 rounded-full bg-gray-600";
+                 document.getElementById('gps-dot').className = (data.gps_st === "ON") ? "w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e]" : "w-1.5 h-1.5 rounded-full bg-gray-600";
             }
         }
 
