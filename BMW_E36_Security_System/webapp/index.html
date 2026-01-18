@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BMW E36 Security V4.1 Lite</title>
+    <title>BMW E36 Security V4.4</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <!-- Leaflet para Mapas -->
@@ -108,7 +108,7 @@
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/2048px-BMW.svg.png" alt="BMW Logo" class="w-24 h-24 mx-auto mb-4 drop-shadow-2xl">
         </div>
         <h1 class="text-3xl font-bold text-white mb-2 bmw-font tracking-wider">BMW E36</h1>
-        <p class="text-gray-400 text-sm mb-8 tracking-[0.2em]">CONNECTED DRIVE V4.1 LITE</p>
+        <p class="text-gray-400 text-sm mb-8 tracking-[0.2em]">CONNECTED DRIVE V4.4</p>
         <div class="w-full max-w-xs space-y-4">
             <input type="password" id="pin-code" placeholder="ACCESS CODE" class="w-full bg-white/5 border border-white/10 rounded-full px-6 py-4 text-center text-white placeholder-gray-500 focus:outline-none focus:border-[#ff9b00] font-mono text-xl tracking-widest transition-colors">
             <button onclick="attemptLogin()" class="w-full bg-[#ff9b00] hover:bg-[#e68a00] text-black font-bold py-4 rounded-full shadow-lg transform active:scale-95 transition-all tracking-wider">UNLOCK SYSTEM</button>
@@ -242,10 +242,11 @@
             </div>
         </div>
 
-        <!-- Sistemas -->
+        <!-- Sistemas (GRID ACTUALIZADO 2x2 para incluir STEALTH) -->
         <div class="mb-6">
-            <h3 class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 pl-1">Sistemas</h3>
-            <div class="grid grid-cols-3 gap-3">
+            <h3 class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 pl-1">Sistemas & Sensores</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <!-- WIFI -->
                 <div class="glass-panel rounded-xl p-3 flex flex-col items-center gap-2">
                     <div class="flex justify-between w-full items-start">
                         <i class="fas fa-wifi text-sm text-gray-400"></i>
@@ -257,6 +258,8 @@
                         <button onclick="sendCommand('CMD_WIFI_OFF')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-red-400">OFF</button>
                     </div>
                 </div>
+                
+                <!-- GPS -->
                 <div class="glass-panel rounded-xl p-3 flex flex-col items-center gap-2">
                     <div class="flex justify-between w-full items-start">
                         <i class="fas fa-satellite-dish text-sm text-gray-400"></i>
@@ -268,6 +271,8 @@
                         <button onclick="sendCommand('CMD_GPS_OFF')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-red-400">OFF</button>
                     </div>
                 </div>
+
+                <!-- DISPLAYS -->
                 <div class="glass-panel rounded-xl p-3 flex flex-col items-center gap-2">
                     <div class="flex justify-between w-full items-start">
                         <i class="fas fa-tv text-sm text-gray-400"></i>
@@ -277,6 +282,19 @@
                     <div class="flex gap-1 w-full mt-1">
                         <button onclick="sendCommand('DISPLAY_ON_ALL')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-blue-400">ON</button>
                         <button onclick="sendCommand('DISPLAY_OFF_ALL')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-gray-400">OFF</button>
+                    </div>
+                </div>
+
+                <!-- NUEVO: STANDBY (STEALTH) -->
+                <div class="glass-panel rounded-xl p-3 flex flex-col items-center gap-2">
+                    <div class="flex justify-between w-full items-start">
+                        <i class="fas fa-user-secret text-sm text-gray-400"></i>
+                        <div id="standby-dot" class="w-1.5 h-1.5 rounded-full bg-gray-600"></div>
+                    </div>
+                    <span class="text-[9px] font-bold text-gray-300 mt-1">STEALTH</span>
+                    <div class="flex gap-1 w-full mt-1">
+                        <button onclick="sendCommand('STANDBY_ON')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-purple-400">ON</button>
+                        <button onclick="sendCommand('STANDBY_OFF')" class="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-[8px] text-gray-400">OFF</button>
                     </div>
                 </div>
             </div>
@@ -567,14 +585,14 @@
                         else if(data.alert === "INFO") showNotification("INFO", data.msg, 'info');
                         else showNotification("ALERTA", data.msg || data.alert, 'error');
                     } else {
-                        // --- TRADUCCIÓN JSON V4.1 LITE A ESTRUCTURA DE LA APP ---
-                        // Convertimos claves cortas (m, b, k, g) a legibles para el dashboard
+                        // --- TRADUCCIÓN JSON V4.4 (Con Standby) ---
                         const translatedData = {
                             mode: (data.m !== undefined) ? ["LOCKED", "ACC_ON", "IGN_ON", "RUNNING"][data.m] : data.mode,
                             batt: (data.b !== undefined) ? data.b : data.batt,
                             chapa: (data.k !== undefined) ? (data.k == 1 ? "ON" : "OFF") : data.chapa,
                             gps: (data.g !== undefined) ? data.g : data.gps,
-                            gps_st: (data.gps_st !== undefined) ? data.gps_st : ((data.g || data.gps) ? "ON" : "OFF") 
+                            gps_st: (data.gps_st !== undefined) ? data.gps_st : ((data.g || data.gps) ? "ON" : "OFF"),
+                            standby: (data.s !== undefined) ? (data.s == 1) : false
                         };
                         
                         updateDashboard(translatedData);
@@ -608,7 +626,6 @@
                 if(!isNaN(lat) && !isNaN(lon)) updateMap(lat, lon);
             }
 
-             // Cambio: Aceptamos 0 (que es falsy) verificando undefined
              if(data.batt !== undefined) {
                 const v = parseFloat(data.batt);
                 const battVal = document.getElementById('batt-val');
@@ -618,41 +635,35 @@
 
                 battVal.innerText = v.toFixed(1) + " V";
                 
-                // Calculo de porcentaje (forzamos 0 si es menor a 1V)
                 let pct = 0;
                 if (v > 1.0) pct = Math.max(0, Math.min(100, (v - 11.0) * (100 / 3.5)));
                 battBar.style.width = pct + "%";
 
                 if(v < 1.0) {
-                    // ESTADO: BATERIA DESCONECTADA (0.0 V)
                     battBar.className = "battery-bar-fill bg-gray-700";
                     battVal.className = "text-sm font-bold text-gray-500 bmw-font";
                     battStat.innerText = "BATERIA DESCONECTADA";
-                    battStat.className = "text-[7px] text-gray-500 font-bold tracking-wide"; // Fuente pequeña para que entre
+                    battStat.className = "text-[7px] text-gray-500 font-bold tracking-wide"; 
                     battIcon.className = "fas fa-plug-circle-xmark text-gray-500";
                 } else if(v < 11.5) {
-                    // CRÍTICO
                     battBar.className = "battery-bar-fill bg-red-600";
                     battVal.className = "text-sm font-bold text-red-500 bmw-font animate-pulse";
                     battStat.innerText = "CRÍTICO";
                     battStat.className = "text-[9px] text-red-500 font-bold";
                     battIcon.className = "fas fa-car-battery text-red-500 animate-bounce";
                 } else if (v <= 12.8) {
-                    // STANDBY / OFF
                     battBar.className = "battery-bar-fill bg-blue-400";
                     battVal.className = "text-sm font-bold text-blue-300 bmw-font";
                     battStat.innerText = "STANDBY";
                     battStat.className = "text-[9px] text-blue-300";
                     battIcon.className = "fas fa-car-battery text-blue-400";
                 } else if (v <= 14.8) {
-                    // CARGANDO
                     battBar.className = "battery-bar-fill bg-green-500";
                     battVal.className = "text-sm font-bold text-green-400 bmw-font";
                     battStat.innerText = "CARGANDO";
                     battStat.className = "text-[9px] text-green-500 font-bold";
                     battIcon.className = "fas fa-car-battery text-green-400";
                 } else {
-                    // SOBRECARGA
                     battBar.className = "battery-bar-fill bg-green-500";
                     battVal.className = "text-sm font-bold text-green-400 bmw-font";
                     battStat.innerText = "SOBRECARGA";
@@ -680,6 +691,10 @@
             
             if(data.gps_st) {
                  document.getElementById('gps-dot').className = (data.gps_st === "ON") ? "w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e]" : "w-1.5 h-1.5 rounded-full bg-gray-600";
+            }
+
+            if(data.standby !== undefined) {
+                 document.getElementById('standby-dot').className = (data.standby) ? "w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_5px_purple]" : "w-1.5 h-1.5 rounded-full bg-gray-600";
             }
         }
 
