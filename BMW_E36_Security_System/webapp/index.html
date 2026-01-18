@@ -89,7 +89,8 @@
         ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
-<body class="h-screen w-screen overflow-hidden select-none relative bg-black">
+<!-- UPDATED: h-[100dvh] ensures full height on mobile browsers with dynamic address bars -->
+<body class="h-[100dvh] w-screen overflow-hidden select-none relative bg-black">
 
     <!-- TOAST -->
     <div id="toast-notification" class="absolute top-4 left-4 right-4 z-[3000] glass-panel rounded-xl p-4 border-l-4 flex items-center gap-4 shadow-2xl toast-success">
@@ -446,7 +447,8 @@
             // Solo centrar si no estamos viendo historial activamente
             if(pathCoords.length === 0) map.panTo(newLatLng);
             
-            document.getElementById('map-coords').innerText = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+            // UPDATED: toFixed(6) for full 6-digit precision
+            document.getElementById('map-coords').innerText = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
         }
 
         function addToHistory(lat, lon, timestamp) {
@@ -458,8 +460,6 @@
 
             const dateObj = new Date(timestamp * 1000);
             // *** CORRECCIÓN ZONA HORARIA ***
-            // Como el ESP32 ya mandó la hora corregida (ej: UTC -4), mostramos la hora UTC directa
-            // para que el navegador no intente restarle otras 4 horas.
             const dateStr = dateObj.getUTCDate() + "/" + (dateObj.getUTCMonth()+1) + "/" + dateObj.getUTCFullYear() + " " + 
                             dateObj.getUTCHours().toString().padStart(2, '0') + ":" + 
                             dateObj.getUTCMinutes().toString().padStart(2, '0') + ":" + 
@@ -469,11 +469,12 @@
                 radius: 6, fillColor: "#ff9b00", color: "#fff", weight: 1, opacity: 1, fillOpacity: 0.8
             });
 
+            // UPDATED: toFixed(6) for full 6-digit precision
             pointMarker.bindPopup(`
                 <div class="text-center">
                     <div class="text-xs text-gray-400 font-bold mb-1">REGISTRO HISTÓRICO</div>
                     <div class="text-sm font-bold text-white">${dateStr}</div>
-                    <div class="text-[10px] text-blue-400 mt-1">${lat.toFixed(5)}, ${lon.toFixed(5)}</div>
+                    <div class="text-[10px] text-blue-400 mt-1">${lat.toFixed(6)}, ${lon.toFixed(6)}</div>
                 </div>
             `);
 
