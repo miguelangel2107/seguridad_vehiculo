@@ -1,13 +1,9 @@
 /*
- * SISTEMA DE SEGURIDAD VEHICULAR BMW E36 - ESP32 MAESTRO V3.9.3
- * Integración: A9G, Huella, OLED, LCD, CAMARA, Bateria, Historial GPS.
- * * * CORRECCIÓN V3.9.3:
- * - Restauradas funciones CRÍTICAS parseCLK() y processGPSLine() que faltaban.
- * - Código completo (~950 líneas).
- * * * CAMBIOS PREVIOS:
- * - V3.9.2: Fix connectA9G.
- * - V3.9.1: Hora Real.
- * - V3.9: GPS Asíncrono.
+ * SISTEMA DE SEGURIDAD VEHICULAR BMW E36 - ESP32 MAESTRO V4.4 STANDBY
+ * * NUEVA FUNCIÓN V4.4:
+ * - MODO STANDBY: Apaga periféricos (OLED, LCD, LEDs) y pausa sensores (Cam, Huella)
+ * para ahorro de energía y rastreo sigiloso ("Stealth Mode").
+ * - Mantiene GPS y MQTT activos.
  */
 
 #include <Wire.h>
@@ -54,13 +50,13 @@
 const char* APN = "internet.tigo.bo";
 const char* MQTT_BROKER = "broker.hivemq.com";
 const int   MQTT_PORT = 1883; 
-const char* MQTT_CLIENT_ID = "BMW_E36_David_ESP_V2";
+const char* MQTT_CLIENT_ID = "BMW_E36_David_ESP_Lite";
 
 // --- ESTRUCTURAS DE DATOS ---
 struct LocationPoint {
   unsigned long timestamp; 
-  float lat;
-  float lon;
+  float lat; 
+  float lon; 
   int speed;
 };
 
@@ -83,8 +79,8 @@ bool jsonSendingEnabled = true;
 int fingerprintFailCount = 0;
 String currentGPS = "-16.5000,-68.1500"; 
 float lastLat = 0.0; 
-float lastLon = 0.0;
-String mqttState = "Disc";
+float lastLon = 0.0; 
+String mqttState = "Boot"; 
 String lastLog = "Init";
 String serialBuffer[4]; 
 
@@ -120,7 +116,7 @@ int fingerResetCount = 0;
 // Sistema
 bool originalKeyEnabled = false; 
 bool gpsEnabled = true; 
-int mqttErrorCount = 0;
+bool standbyMode = false; // NUEVA VARIABLE V4.4
 
 // Timers
 unsigned long lastBlink = 0;
@@ -182,6 +178,8 @@ void toggleGPS(bool state);
 void sendAlert(String type, String msg); 
 void processGPSLine(String line); 
 void parseCLK(String line); 
+void waitForA9G_Boot();
+void toggleStandby(bool state); // Nueva función V4.4
 
 void setup() {
   Serial.begin(115200, SERIAL_8N1, CAM_RX_PIN, CAM_TX_PIN);
@@ -215,11 +213,11 @@ void setup() {
   
   if(!oled.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { 
   } else {
-     oled.clearDisplay(); oled.display();
+      oled.clearDisplay(); oled.display();
   }
 
   SerialA9G.begin(115200, SERIAL_8N1, A9G_RX_PIN, A9G_TX_PIN);
-  SerialA9G.setTimeout(10); 
+  SerialA9G.setTimeout(100); 
   
   SerialFinger.begin(57600, SERIAL_8N1, FINGER_RX_PIN, FINGER_TX_PIN);
   if (finger.verifyPassword()) {
@@ -233,6 +231,8 @@ void setup() {
   for(int i=0; i<4; i++) serialBuffer[i] = "";
 
   lastCamHeartbeat = millis(); 
+
+  waitForA9G_Boot();
 
   connectA9G_MQTT();
   delay(1000);
@@ -268,6 +268,83 @@ void loop() {
 }
 
 // --- LOGICA PRINCIPAL ---
+
+// Función para MODO BAJO CONSUMO / SIGILO
+void toggleStandby(bool state) {
+    standbyMode = state;
+    if (state) {
+        // ACTIVAR STANDBY
+        logMsg("STANDBY: ON");
+        
+        // Apagar pantallas
+        displaysEnabled = false;
+        lcd.noBacklight();
+        oled.ssd1306_command(SSD1306_DISPLAYOFF);
+        
+        // Desactivar lógica de sensores (Hardware sigue energizado si no tiene relé, pero ESP no procesa)
+        cameraEnabled = false; 
+        fingerEnabled = false; 
+        
+        // Apagar LEDs
+        digitalWrite(LED_LOCKED, LOW); 
+        
+    } else {
+        // DESACTIVAR STANDBY
+        logMsg("STANDBY: OFF");
+        
+        // Reactivar Pantallas
+        toggleDisplays(true); 
+        
+        // Reactivar sensores
+        cameraEnabled = true;
+        lastCamHeartbeat = millis(); // Reset timer para evitar error inmediato
+        
+        fingerEnabled = true;
+        fingerResetCount = 0;
+    }
+    sendStatusJSON();
+}
+
+void waitForA9G_Boot() {
+    updateLCD("SISTEMA", "INICIANDO A9G...");
+    logMsg("Esperando A9G...");
+    
+    while(SerialA9G.available()) SerialA9G.read();
+    
+    bool a9gReady = false;
+    int attempts = 0;
+    
+    while(!a9gReady && attempts < 30) {
+        SerialA9G.println("AT");
+        delay(500); 
+        
+        while(SerialA9G.available()) {
+            String r = SerialA9G.readStringUntil('\n');
+            if(r.indexOf("OK") != -1) {
+                a9gReady = true;
+                break;
+            }
+        }
+        
+        if(!a9gReady) {
+            attempts++;
+            oled.clearDisplay(); 
+            oled.setCursor(0,0); oled.print("Booting A9G..."); 
+            oled.setCursor(0,20); oled.print("Intento: " + String(attempts));
+            oled.display();
+            delay(500);
+        }
+    }
+    
+    if(a9gReady) {
+        logMsg("A9G Detectado!");
+        updateLCD("A9G", "DETECTADO OK");
+        delay(1000);
+    } else {
+        logMsg("A9G Timeout!");
+        updateLCD("A9G", "NO RESPONDE");
+    }
+}
 
 void changeStage(int newStage) {
   vehicleStage = newStage;
@@ -327,6 +404,9 @@ void sendDoorCommand() {
 }
 
 void checkHardwareHealth() {
+  // Si estamos en Standby, NO chequear salud de periféricos apagados
+  if(standbyMode) return; 
+
   unsigned long now = millis();
 
   if (displaysEnabled && (now - lastDisplayCheck > 2000)) {
@@ -351,16 +431,16 @@ void checkHardwareHealth() {
   }
 
   if (cameraEnabled && (now - lastCamHeartbeat > 25000)) {
-     camErrorCount++;
-     if (camErrorCount >= 3) {
-         cameraEnabled = false; 
-         cameraHealthy = false;
-         logMsg("CAM APAGADA (ERR)");
-         sendAlert("CAM_FAIL", "Camara Desactivada por timeout");
-     } else {
-         lastCamHeartbeat = now;
-         logMsg("Camara Timeout " + String(camErrorCount));
-     }
+      camErrorCount++;
+      if (camErrorCount >= 3) {
+          cameraEnabled = false; 
+          cameraHealthy = false;
+          logMsg("CAM APAGADA (ERR)");
+          sendAlert("CAM_FAIL", "Camara Desactivada por timeout");
+      } else {
+          lastCamHeartbeat = now;
+          logMsg("Camara Timeout " + String(camErrorCount));
+      }
   }
 
   if (fingerEnabled && fingerResetCount >= 3) {
@@ -410,18 +490,18 @@ void handleFingerprint() {
   int p = finger.getImage();
   
   if (p == FINGERPRINT_PACKETRECIEVEERR) {
-     fingerCommErrors++;
-     if (fingerCommErrors > 5) {
-        fingerResetCount++;
-        fingerCommErrors = 0;
-        fingerHealthy = false;
-        logMsg("Huella Fallo " + String(fingerResetCount));
-     }
-     return;
+      fingerCommErrors++;
+      if (fingerCommErrors > 5) {
+         fingerResetCount++;
+         fingerCommErrors = 0;
+         fingerHealthy = false;
+         logMsg("Huella Fallo " + String(fingerResetCount));
+      }
+      return;
   } else {
-     fingerCommErrors = 0;
-     fingerResetCount = 0; 
-     fingerHealthy = true;
+      fingerCommErrors = 0;
+      fingerResetCount = 0; 
+      fingerHealthy = true;
   }
 
   if (p != FINGERPRINT_OK) return;
@@ -480,8 +560,8 @@ void handleBatteryLogic(float volts) {
   
   static String lastBatStatus = "";
   if(lastBatStatus != batteryStatus) {
-     if(currentMenuState == MAIN_MENU && displaysEnabled) updateOLEDMenu();
-     lastBatStatus = batteryStatus;
+      if(currentMenuState == MAIN_MENU && displaysEnabled) updateOLEDMenu();
+      lastBatStatus = batteryStatus;
   }
 }
 
@@ -508,7 +588,7 @@ void updateLCD(String line1, String line2) {
 }
 
 void handleConnectionWatchdog() {
-  if (millis() - lastConnCheck < 30000) return;
+  if (millis() - lastConnCheck < 40000) return;
   lastConnCheck = millis();
 
   if (mqttState != "OK" && mqttState != "Conn...") {
@@ -542,16 +622,12 @@ void toggleGPS(bool state) {
 void sendStatusJSON() {
   if(!mqttEnabled || !jsonSendingEnabled) return;
   
-  String modeStr = (vehicleStage==0)?"LOCKED":(vehicleStage==1)?"ACC_ON":(vehicleStage==2)?"IGN_ON":"RUNNING";
-  String chapaStr = originalKeyEnabled ? "ON" : "OFF";
-  String gpsStr = gpsEnabled ? "ON" : "OFF";
-  
-  String json = "{'mode':'"+modeStr+
-                "','batt':'"+String(batteryVoltage, 1)+
-                "','batt_st':'"+batteryStatus+
-                "','chapa':'"+chapaStr+
-                "','gps_st':'"+gpsStr+
-                "','gps':'"+currentGPS+"'}";
+  // JSON V4.4: Se agrega 's' para Standby
+  String json = "{'m':" + String(vehicleStage) +
+                ",'b':" + String(batteryVoltage, 1) +
+                ",'k':" + (originalKeyEnabled ? "1" : "0") +
+                ",'g':'" + currentGPS + "'" +
+                ",'s':" + (standbyMode ? "1" : "0") + "}";
                 
   sendAT(SerialA9G, "AT+MQTTPUB=\""+String(MQTT_TOPIC_PUB_JSON)+"\",\""+json+"\",0,0,0", 150);
 }
@@ -603,6 +679,10 @@ void processMQTTCommand(String line) {
       logMsg("Huella: RESET");
   }
   
+  // NUEVOS COMANDOS STANDBY
+  else if (cmdLine.indexOf("STANDBY_ON") != -1) toggleStandby(true);
+  else if (cmdLine.indexOf("STANDBY_OFF") != -1) toggleStandby(false);
+  
   else if (cmdLine.indexOf("CMD_GPS_ON") != -1) toggleGPS(true);
   else if (cmdLine.indexOf("CMD_GPS_OFF") != -1) toggleGPS(false);
   else if (cmdLine.indexOf("GET_HISTORY_ALL") != -1) sendHistoryMQTT(HISTORY_SIZE);
@@ -619,27 +699,16 @@ void handleA9G() {
        if (line.indexOf("+MQTTPUBLISH") != -1) {
            processMQTTCommand(line);
            mqttState = "OK"; 
-           mqttErrorCount = 0; 
        }
-       else if (line.indexOf("RDY") != -1 || line.indexOf("+CIEV") != -1) {
+       else if (line.indexOf("RDY") != -1) {
            mqttState = "Disc";
            logMsg("A9G Reiniciado!!");
-           mqttErrorCount = 5; 
        }
        else if (line.indexOf("MQTT DISCONNECTED") != -1) {
            mqttState = "Disc";
+           logMsg("MQTT CERRADO");
        }
-       else if (line.indexOf("ERROR") != -1) {
-           mqttErrorCount++;
-           if(mqttErrorCount >= 5) {
-               mqttState = "Error"; 
-               mqttErrorCount = 0;
-               logMsg("Fallo Conn (Errors)");
-           }
-       }
-       else if (line == "OK") {
-           if(mqttErrorCount > 0) mqttErrorCount--;
-       }
+       
        else if (line.indexOf("+CCLK:") != -1) { 
            parseCLK(line);
        }
@@ -676,7 +745,6 @@ void parseCLK(String line) {
 }
 
 void processGPSLine(String line) {
-    // Parser GPS (Ignora ecos y errores)
     if (line.indexOf(',') > 0 && line.length() > 10 && line.indexOf('{') == -1 && line.indexOf("AT+") == -1) {
         bool validChars = true;
         for(int i=0; i<line.length(); i++) {
@@ -699,17 +767,18 @@ void processGPSLine(String line) {
     }
 }
 
-// --- FUNCIONES QUE FALTABAN ---
+// --- FUNCIONES ---
 void connectA9G_MQTT() {
   logMsg("Conectando...");
   mqttState = "Conn..."; 
-  mqttErrorCount = 0; 
+  
   updateOLEDMenu();
   
   sendAT(SerialA9G, "ATE0", 500); 
   sendAT(SerialA9G, "AT+CGATT=1", 2000);
   sendAT(SerialA9G, "AT+CGDCONT=1,\"IP\",\"" + String(APN) + "\"", 1000);
   sendAT(SerialA9G, "AT+CGACT=1,1", 2000);
+
   sendAT(SerialA9G, "AT+MQTTCONN=\"" + String(MQTT_BROKER) + "\"," + String(MQTT_PORT) + ",\"" + String(MQTT_CLIENT_ID) + "\",120,0", 5000);
   sendAT(SerialA9G, "AT+MQTTSUB=\"" + String(MQTT_TOPIC_SUB) + "\",1,0", 2000);
   
@@ -734,7 +803,8 @@ void resetA9GModule() {
   logMsg("Resetting A9G...");
   sendAT(SerialA9G, "AT+RST=1", 1000); 
   mqttState = "Reset";
-  delay(12000); 
+  // Esperar a que reviva despues del reset
+  waitForA9G_Boot(); 
   connectA9G_MQTT(); 
 }
 
@@ -747,6 +817,12 @@ void logMsg(String msg) {
 }
 
 void handleStatusLeds() {
+  // LED apagado en Standby
+  if(standbyMode) {
+      digitalWrite(LED_LOCKED, LOW);
+      return;
+  }
+
   if (vehicleStage == 0) {
     if (millis() - lastBlink >= 800) { 
         lastBlink = millis(); 
@@ -940,7 +1016,7 @@ void handleMenuNavigation() {
   if (update) updateOLEDMenu();
 }
 
-void saveLocationHistory(float lat, float lon, int speed) {
+void saveLocationHistory(float lat, float lon, int speed) { 
   unsigned long now = millis();
   
   unsigned long timestampToSave;
@@ -992,6 +1068,7 @@ void sendHistoryMQTT(int count) {
   for (int i = 0; i < count; i++) {
     int idx = (currentIdx + i) % HISTORY_SIZE;
     
+    // JSON HISTORIAL OPTIMIZADO: claves cortas
     String json = "{'t':" + String(history[idx].timestamp) + 
                   ",'lat':" + String(history[idx].lat, 6) + 
                   ",'lon':" + String(history[idx].lon, 6) + "}";
