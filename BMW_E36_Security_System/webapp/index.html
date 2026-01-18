@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BMW E36 Security V4.5</title>
+    <title>BMW E36 Security V4.1 Lite</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <!-- Leaflet para Mapas -->
@@ -89,7 +89,6 @@
         ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
-<!-- UPDATED: h-[100dvh] ensures full height on mobile browsers with dynamic address bars -->
 <body class="h-[100dvh] w-screen overflow-hidden select-none relative bg-black">
 
     <!-- TOAST -->
@@ -109,7 +108,7 @@
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/2048px-BMW.svg.png" alt="BMW Logo" class="w-24 h-24 mx-auto mb-4 drop-shadow-2xl">
         </div>
         <h1 class="text-3xl font-bold text-white mb-2 bmw-font tracking-wider">BMW E36</h1>
-        <p class="text-gray-400 text-sm mb-8 tracking-[0.2em]">CONNECTED DRIVE V4.5</p>
+        <p class="text-gray-400 text-sm mb-8 tracking-[0.2em]">CONNECTED DRIVE V4.1 LITE</p>
         <div class="w-full max-w-xs space-y-4">
             <input type="password" id="pin-code" placeholder="ACCESS CODE" class="w-full bg-white/5 border border-white/10 rounded-full px-6 py-4 text-center text-white placeholder-gray-500 focus:outline-none focus:border-[#ff9b00] font-mono text-xl tracking-widest transition-colors">
             <button onclick="attemptLogin()" class="w-full bg-[#ff9b00] hover:bg-[#e68a00] text-black font-bold py-4 rounded-full shadow-lg transform active:scale-95 transition-all tracking-wider">UNLOCK SYSTEM</button>
@@ -365,15 +364,12 @@
             const pin = document.getElementById('pin-code').value;
             if(pin === "1234" || pin === "") {
                 document.getElementById('login-screen').style.opacity = '0';
-                
-                // --- CAMBIO CLAVE V4.5: INICIAR CONEXION ANTES QUE EL MAPA ---
-                connectMQTT(); // Conectar MQTT primero
+                connectMQTT(); 
 
                 setTimeout(() => {
                     document.getElementById('login-screen').classList.add('hidden');
-                    document.getElementById('main-app').classList.remove('hidden');
+                    document.getElementById('dashboard-screen').classList.remove('hidden');
                     
-                    // Inicializar mapa de forma segura
                     try {
                        initFullMap();
                     } catch(e) {
@@ -390,13 +386,11 @@
             const dashboard = document.getElementById('dashboard-screen');
             const mapScreen = document.getElementById('map-screen');
             
-            // Animación
             dashboard.style.transform = "translateX(-30%)";
             dashboard.style.opacity = "0";
             mapScreen.classList.remove('hidden-right');
             
             if(!isMapInit) {
-                // Si no se inició al login, intentar de nuevo
                 setTimeout(initFullMap, 300);
             } else {
                 setTimeout(() => { if(map) map.invalidateSize(); }, 300);
@@ -447,7 +441,6 @@
             // Solo centrar si no estamos viendo historial activamente
             if(pathCoords.length === 0) map.panTo(newLatLng);
             
-            // UPDATED: toFixed(6) for full 6-digit precision
             document.getElementById('map-coords').innerText = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
         }
 
@@ -459,7 +452,6 @@
             polyline.setLatLngs(pathCoords);
 
             const dateObj = new Date(timestamp * 1000);
-            // *** CORRECCIÓN ZONA HORARIA ***
             const dateStr = dateObj.getUTCDate() + "/" + (dateObj.getUTCMonth()+1) + "/" + dateObj.getUTCFullYear() + " " + 
                             dateObj.getUTCHours().toString().padStart(2, '0') + ":" + 
                             dateObj.getUTCMinutes().toString().padStart(2, '0') + ":" + 
@@ -469,7 +461,6 @@
                 radius: 6, fillColor: "#ff9b00", color: "#fff", weight: 1, opacity: 1, fillOpacity: 0.8
             });
 
-            // UPDATED: toFixed(6) for full 6-digit precision
             pointMarker.bindPopup(`
                 <div class="text-center">
                     <div class="text-xs text-gray-400 font-bold mb-1">REGISTRO HISTÓRICO</div>
@@ -494,15 +485,13 @@
             showNotification("MAPA LIMPIO", "Visualización reseteada", 'info');
         }
 
-        // --- MQTT CONFIGURACIÓN (RESTAURADA V3.4) ---
+        // --- MQTT CONFIGURACIÓN ---
         function connectMQTT() {
-            // Feedback Visual Inmediato
             const st = document.getElementById('connection-status');
             st.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></span> CONECTANDO...';
             st.classList.remove('text-red-500'); st.classList.add('text-yellow-500');
 
             console.log("Conectando...");
-            // Constructor V3.4 (Sin path extra)
             client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID);
             client.onConnectionLost = onConnectionLost;
             client.onMessageArrived = onMessageArrived;
@@ -550,7 +539,6 @@
         }
         
         function sendCommandWithConfirm(cmd, text) { if(confirm(text)) sendCommand(cmd); }
-        function registrarHuella() { if(confirm("¿Iniciar registro de huella?")) sendCommand('NUEVA_HUELLA'); }
 
         function showNotification(title, message, type = 'info') {
             const toast = document.getElementById('toast-notification');
@@ -579,7 +567,17 @@
                         else if(data.alert === "INFO") showNotification("INFO", data.msg, 'info');
                         else showNotification("ALERTA", data.msg || data.alert, 'error');
                     } else {
-                        updateDashboard(data);
+                        // --- TRADUCCIÓN JSON V4.1 LITE A ESTRUCTURA DE LA APP ---
+                        // Convertimos claves cortas (m, b, k, g) a legibles para el dashboard
+                        const translatedData = {
+                            mode: (data.m !== undefined) ? ["LOCKED", "ACC_ON", "IGN_ON", "RUNNING"][data.m] : data.mode,
+                            batt: (data.b !== undefined) ? data.b : data.batt,
+                            chapa: (data.k !== undefined) ? (data.k == 1 ? "ON" : "OFF") : data.chapa,
+                            gps: (data.g !== undefined) ? data.g : data.gps,
+                            gps_st: (data.gps_st !== undefined) ? data.gps_st : ((data.g || data.gps) ? "ON" : "OFF") 
+                        };
+                        
+                        updateDashboard(translatedData);
                     }
                 }
                 else if (message.destinationName === TOPIC_SUB_HIST) {
@@ -610,7 +608,8 @@
                 if(!isNaN(lat) && !isNaN(lon)) updateMap(lat, lon);
             }
 
-             if(data.batt) {
+             // Cambio: Aceptamos 0 (que es falsy) verificando undefined
+             if(data.batt !== undefined) {
                 const v = parseFloat(data.batt);
                 const battVal = document.getElementById('batt-val');
                 const battBar = document.getElementById('batt-bar');
@@ -618,27 +617,47 @@
                 const battIcon = document.getElementById('batt-icon');
 
                 battVal.innerText = v.toFixed(1) + " V";
-                let pct = Math.max(0, Math.min(100, (v - 11.0) * (100 / 3.5)));
+                
+                // Calculo de porcentaje (forzamos 0 si es menor a 1V)
+                let pct = 0;
+                if (v > 1.0) pct = Math.max(0, Math.min(100, (v - 11.0) * (100 / 3.5)));
                 battBar.style.width = pct + "%";
 
-                if(v < 11.5) {
+                if(v < 1.0) {
+                    // ESTADO: BATERIA DESCONECTADA (0.0 V)
+                    battBar.className = "battery-bar-fill bg-gray-700";
+                    battVal.className = "text-sm font-bold text-gray-500 bmw-font";
+                    battStat.innerText = "BATERIA DESCONECTADA";
+                    battStat.className = "text-[7px] text-gray-500 font-bold tracking-wide"; // Fuente pequeña para que entre
+                    battIcon.className = "fas fa-plug-circle-xmark text-gray-500";
+                } else if(v < 11.5) {
+                    // CRÍTICO
                     battBar.className = "battery-bar-fill bg-red-600";
                     battVal.className = "text-sm font-bold text-red-500 bmw-font animate-pulse";
                     battStat.innerText = "CRÍTICO";
                     battStat.className = "text-[9px] text-red-500 font-bold";
                     battIcon.className = "fas fa-car-battery text-red-500 animate-bounce";
-                } else if (v > 13.0) {
-                    battBar.className = "battery-bar-fill bg-green-500";
-                    battVal.className = "text-sm font-bold text-green-400 bmw-font";
-                    battStat.innerText = (v > 14.8) ? "SOBRECARGA" : "CARGANDO";
-                    battStat.className = "text-[9px] text-green-500 font-bold";
-                    battIcon.className = "fas fa-car-battery text-green-400";
-                } else {
+                } else if (v <= 12.8) {
+                    // STANDBY / OFF
                     battBar.className = "battery-bar-fill bg-blue-400";
                     battVal.className = "text-sm font-bold text-blue-300 bmw-font";
                     battStat.innerText = "STANDBY";
                     battStat.className = "text-[9px] text-blue-300";
                     battIcon.className = "fas fa-car-battery text-blue-400";
+                } else if (v <= 14.8) {
+                    // CARGANDO
+                    battBar.className = "battery-bar-fill bg-green-500";
+                    battVal.className = "text-sm font-bold text-green-400 bmw-font";
+                    battStat.innerText = "CARGANDO";
+                    battStat.className = "text-[9px] text-green-500 font-bold";
+                    battIcon.className = "fas fa-car-battery text-green-400";
+                } else {
+                    // SOBRECARGA
+                    battBar.className = "battery-bar-fill bg-green-500";
+                    battVal.className = "text-sm font-bold text-green-400 bmw-font";
+                    battStat.innerText = "SOBRECARGA";
+                    battStat.className = "text-[9px] text-green-500 font-bold";
+                    battIcon.className = "fas fa-car-battery text-green-400";
                 }
             }
 
