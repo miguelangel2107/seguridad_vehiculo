@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BMW Security Cloud V6.3</title>
+    <title>BMW Security Cloud V6.4</title>
     
     <!-- Estilos y Utilidades -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -185,15 +185,13 @@
         }
         .btn-primary:active { transform: scale(0.98); }
 
+        /* Toast Corregido para visualizarse siempre */
         #toast-notification {
-            transform: translateY(-150%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 5000;
+            transform: translateY(-200%); 
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 9999; /* Z-Index muy alto */
         }
         #toast-notification.show { transform: translateY(0); }
-        .toast-success { border-left: 4px solid #10b981; background: rgba(6, 78, 59, 0.95); backdrop-filter: blur(10px); }
-        .toast-danger { border-left: 4px solid #ef4444; background: rgba(127, 29, 29, 0.95); backdrop-filter: blur(10px); }
-        .toast-info { border-left: 4px solid #3b82f6; background: rgba(30, 58, 138, 0.95); backdrop-filter: blur(10px); }
-        .toast-face { border-left: 4px solid #f59e0b; background: rgba(120, 53, 15, 0.95); backdrop-filter: blur(10px); }
         
         .loader { border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top: 3px solid #3b82f6; width: 24px; height: 24px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -202,7 +200,7 @@
 <body class="select-none">
 
     <!-- TOAST -->
-    <div id="toast-notification" class="fixed top-6 left-4 right-4 rounded-2xl p-4 shadow-2xl flex items-center gap-4 border border-white/10">
+    <div id="toast-notification" class="fixed top-6 left-4 right-4 rounded-2xl p-4 shadow-2xl flex items-center gap-4 border-l-4 border border-white/10 backdrop-blur-md bg-gray-900/90">
         <div class="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center shrink-0 border border-white/10">
             <i id="toast-icon" class="fas fa-bell text-xl text-white"></i>
         </div>
@@ -217,7 +215,7 @@
         <div class="text-center animate-pulse">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/2048px-BMW.svg.png" alt="Logo" class="w-32 h-32 mx-auto mb-6">
             <h1 class="text-2xl font-bold text-white tech-font tracking-widest">SECURE CLOUD</h1>
-            <p class="text-gray-500 text-xs tracking-[0.5em] mt-2">V6.3 SYSTEM</p>
+            <p class="text-gray-500 text-xs tracking-[0.5em] mt-2">V6.4 SYSTEM</p>
         </div>
     </div>
 
@@ -580,7 +578,7 @@
                 <div class="glass-panel rounded-xl p-4 text-center">
                     <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Información del Sistema</h3>
                     <div class="text-[9px] text-gray-600 font-mono">
-                        APP VERSION: 6.3 CLOUD<br>
+                        APP VERSION: 6.4 CLOUD<br>
                         ESP32 FIRMWARE: V5.0<br>
                         CLIENT ID: <span id="client-id-disp">UNKNOWN</span>
                     </div>
@@ -678,11 +676,11 @@
                         if (currentUserData.lockedPermanent) showPinScreen(true);
                         else showPinScreen();
                     } else {
-                        showToast("Error", "Usuario sin datos", "error");
+                        showNotification("Error", "Usuario sin datos", "error");
                         auth.signOut();
                     }
                 } catch (e) {
-                    showToast("Error", "Conexión fallida", "error");
+                    showNotification("Error", "Conexión fallida", "error");
                 }
             } else {
                 showScreen('screen-auth');
@@ -697,7 +695,7 @@
             const deviceId = document.getElementById('reg-device-id').value.trim().toUpperCase();
             const pin = document.getElementById('reg-pin').value;
 
-            if (!email || !pass || !brand || !deviceId || pin.length !== 4) return showToast("Error", "Datos incompletos", "error");
+            if (!email || !pass || !brand || !deviceId || pin.length !== 4) return showNotification("Error", "Datos incompletos", "error");
 
             try {
                 const cred = await auth.createUserWithEmailAndPassword(email, pass);
@@ -705,21 +703,21 @@
                     email, brand, deviceId, pin,
                     failedAttempts: 0, lockoutUntil: 0, lockedPermanent: false, createdAt: new Date()
                 });
-                showToast("Éxito", "Registrado", "success");
-            } catch (e) { showToast("Error", e.message, "error"); }
+                showNotification("Éxito", "Registrado", "success");
+            } catch (e) { showNotification("Error", e.message, "error"); }
         }
 
         async function handleLogin() {
             const email = document.getElementById('login-email').value;
             const pass = document.getElementById('login-pass').value;
-            if (!email || !pass) return showToast("Error", "Faltan datos", "error");
+            if (!email || !pass) return showNotification("Error", "Faltan datos", "error");
             
             document.getElementById('btn-login-text').classList.add('hidden');
             document.getElementById('btn-login-load').classList.remove('hidden');
 
             try { await auth.signInWithEmailAndPassword(email, pass); } 
             catch (e) { 
-                showToast("Error", "Credenciales inválidas", "error");
+                showNotification("Error", "Credenciales inválidas", "error");
                 document.getElementById('btn-login-text').classList.remove('hidden');
                 document.getElementById('btn-login-load').classList.add('hidden');
             }
@@ -749,7 +747,7 @@
             const now = Date.now();
 
             if (currentUserData.lockedPermanent) { showPinScreen(true); return; }
-            if (currentUserData.lockoutUntil > now) { showToast("Bloqueado", "Tiempo activo", "error"); clearPin(); return; }
+            if (currentUserData.lockoutUntil > now) { showNotification("Bloqueado", "Tiempo activo", "error"); clearPin(); return; }
 
             if (input === currentUserData.pin) {
                 if (currentUserData.failedAttempts > 0) await userRef.update({ failedAttempts: 0, lockoutUntil: 0 });
@@ -769,7 +767,7 @@
                 await userRef.update({ failedAttempts: fails, lockoutUntil: lockTime, lockedPermanent: permLock });
                 currentUserData.lockoutUntil = lockTime;
                 
-                showToast("Error", msg, "error");
+                showNotification("Error", msg, "error");
                 clearPin();
                 if(permLock) showPinScreen(true);
                 else if(lockTime > 0) checkLockoutTimer();
@@ -893,19 +891,38 @@
             document.getElementById(id).classList.add('active');
         }
 
-        function showToast(title, msg, type) {
+        function showNotification(title, msg, type = 'info') {
             const t = document.getElementById('toast-notification');
             const icon = document.getElementById('toast-icon');
             const tit = document.getElementById('toast-title');
             const mess = document.getElementById('toast-message');
             
-            tit.innerText = title; mess.innerText = msg;
-            t.className = `fixed top-6 left-4 right-4 z-[5000] rounded-2xl p-4 shadow-2xl flex items-center gap-4 border border-white/10 transition-all duration-300 translate-y-0 border-l-4 ${type==='error'?'border-red-500 bg-red-900/90':'border-green-500 bg-green-900/90'}`;
-            if(type === 'face') t.className = t.className.replace('border-green-500', 'border-yellow-500'); // Face override
+            tit.innerText = title; 
+            mess.innerText = msg;
             
-            icon.className = `fas ${type==='error'?'fa-triangle-exclamation text-red-400':(type==='face'?'fa-user-check text-yellow-400':'fa-check-circle text-green-400')} text-xl`;
+            const baseClasses = "fixed top-6 left-4 right-4 z-[5000] rounded-2xl p-4 shadow-2xl flex items-center gap-4 border border-white/10 backdrop-blur-md transition-all duration-300 border-l-4";
             
-            setTimeout(() => { t.classList.add('-translate-y-[150%]'); }, 3000);
+            let theme = "";
+            let iconCls = "";
+            
+            if (type === 'face') { 
+                theme = "border-yellow-500 bg-yellow-900/90";
+                iconCls = "fas fa-user-check text-xl text-yellow-400";
+            } else if (type === 'error') { 
+                theme = "border-red-500 bg-red-900/90";
+                iconCls = "fas fa-triangle-exclamation text-xl text-red-400";
+            } else { 
+                theme = "border-green-500 bg-green-900/90";
+                iconCls = "fas fa-check-circle text-xl text-green-400";
+            }
+
+            t.className = `${baseClasses} ${theme}`;
+            icon.className = iconCls;
+
+            requestAnimationFrame(() => { t.classList.add('show'); });
+            
+            if(window.toastTimeout) clearTimeout(window.toastTimeout);
+            window.toastTimeout = setTimeout(() => { t.classList.remove('show'); }, 4000);
         }
 
         function switchTab(tabName, element) {
