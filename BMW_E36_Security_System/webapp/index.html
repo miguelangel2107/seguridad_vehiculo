@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BMW Security Cloud V6.4</title>
+    <title>BMW Security Cloud V6.5</title>
     
     <!-- Estilos y Utilidades -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -120,7 +120,7 @@
         }
         #map-screen.visible { transform: translateX(0); }
         #full-map { width: 100%; height: 100%; }
-        .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out, .leaflet-control-attribution { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
 
         /* Header App */
         .header-bar {
@@ -215,7 +215,7 @@
         <div class="text-center animate-pulse">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/2048px-BMW.svg.png" alt="Logo" class="w-32 h-32 mx-auto mb-6">
             <h1 class="text-2xl font-bold text-white tech-font tracking-widest">SECURE CLOUD</h1>
-            <p class="text-gray-500 text-xs tracking-[0.5em] mt-2">V6.4 SYSTEM</p>
+            <p class="text-gray-500 text-xs tracking-[0.5em] mt-2">V6.5 SYSTEM</p>
         </div>
     </div>
 
@@ -255,6 +255,7 @@
             <div class="space-y-3 overflow-y-auto pb-10 flex-1">
                 <div class="p-5 glass-panel rounded-2xl border border-white/5">
                     <h3 class="text-[10px] text-blue-400 font-bold uppercase mb-3 tracking-widest">1. Cuenta de Usuario</h3>
+                    <input type="text" id="reg-owner" placeholder="Nombre del Propietario" class="input-tech mb-3 capitalize"> <!-- NUEVO CAMPO -->
                     <input type="email" id="reg-email" placeholder="Correo Electrónico" class="input-tech mb-3">
                     <input type="password" id="reg-pass" placeholder="Contraseña (Min 6 car.)" class="input-tech">
                 </div>
@@ -338,7 +339,9 @@
                 <img id="app-brand-logo" src="" class="w-10 h-10 object-contain drop-shadow-lg opacity-90">
                 <div>
                     <div class="text-xs font-bold text-white tracking-widest bmw-font" id="app-brand-title">SECURITY</div>
-                    <div id="connection-status" class="text-[9px] text-gray-400 flex items-center gap-1.5 uppercase font-bold tracking-wider mt-0.5">
+                    <!-- NOMBRE DEL PROPIETARIO AÑADIDO -->
+                    <div class="text-[10px] text-gray-400 font-bold uppercase tracking-wide" id="display-owner">CONDUCTOR</div>
+                    <div id="connection-status" class="text-[9px] text-gray-500 flex items-center gap-1.5 uppercase font-bold tracking-wider mt-0.5">
                         <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> Offline
                     </div>
                 </div>
@@ -574,15 +577,6 @@
                         <span class="text-[9px] font-bold text-blue-300">RELOAD APP</span>
                     </button>
                 </div>
-
-                <div class="glass-panel rounded-xl p-4 text-center">
-                    <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Información del Sistema</h3>
-                    <div class="text-[9px] text-gray-600 font-mono">
-                        APP VERSION: 6.4 CLOUD<br>
-                        ESP32 FIRMWARE: V5.0<br>
-                        CLIENT ID: <span id="client-id-disp">UNKNOWN</span>
-                    </div>
-                </div>
             </div>
 
         </div> 
@@ -694,13 +688,14 @@
             const brand = document.getElementById('reg-brand').value;
             const deviceId = document.getElementById('reg-device-id').value.trim().toUpperCase();
             const pin = document.getElementById('reg-pin').value;
+            const owner = document.getElementById('reg-owner').value; // Get Owner Name
 
-            if (!email || !pass || !brand || !deviceId || pin.length !== 4) return showNotification("Error", "Datos incompletos", "error");
+            if (!email || !pass || !brand || !deviceId || pin.length !== 4 || !owner) return showNotification("Error", "Datos incompletos", "error");
 
             try {
                 const cred = await auth.createUserWithEmailAndPassword(email, pass);
                 await db.collection("users").doc(cred.user.uid).set({
-                    email, brand, deviceId, pin,
+                    email, brand, deviceId, pin, ownerName: owner, // Save Owner Name
                     failedAttempts: 0, lockoutUntil: 0, lockedPermanent: false, createdAt: new Date()
                 });
                 showNotification("Éxito", "Registrado", "success");
@@ -813,9 +808,11 @@
         function initAppUI(data) {
             showScreen('screen-app');
             document.getElementById('app-brand-title').innerText = data.brand + " SECURITY";
+            if(data.ownerName) document.getElementById('display-owner').innerText = data.ownerName.toUpperCase(); // Set Owner Name
+            
             const logos = { 'BMW': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/1024px-BMW.svg.png', 'TOYOTA': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Toyota_carlogo.svg/1200px-Toyota_carlogo.svg.png', 'AUDI': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/Audi-Logo_2016.svg/1200px-Audi-Logo_2016.svg.png', 'MERCEDES': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Mercedes-Logo.svg/1024px-Mercedes-Logo.svg.png', 'NISSAN': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Nissan_logo.png/1024px-Nissan_logo.png', 'VOLKSWAGEN': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Volkswagen_logo_2019.svg/1024px-Volkswagen_logo_2019.svg.png', 'SUZUKI': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Suzuki_logo_2.svg/1200px-Suzuki_logo_2.svg.png' };
             if(logos[data.brand]) document.getElementById('app-brand-logo').src = logos[data.brand];
-            document.getElementById('client-id-disp').innerText = DEVICE_ID;
+            // No need to show client id anymore if owner name is there, or can be in maintenance tab
         }
 
         // --- MQTT ---
