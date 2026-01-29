@@ -121,6 +121,15 @@
         #map-screen.visible { transform: translateX(0); }
         #full-map { width: 100%; height: 100%; }
         .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out, .leaflet-control-attribution { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        /* Fix Popup Style for Dark Map */
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: rgba(10, 10, 10, 0.95) !important;
+            color: white !important;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+        }
+        .leaflet-popup-content { margin: 0 !important; width: 160px !important; }
 
         /* Header App */
         .header-bar {
@@ -975,7 +984,7 @@
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
             const carIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3097/3097180.png', iconSize: [40, 40], iconAnchor: [20, 20] });
             marker = L.marker([-16.5000, -68.1500], {icon: carIcon, zIndexOffset: 1000}).addTo(map);
-            polyline = L.polyline([], { color: '#3b82f6', weight: 4, opacity: 0.8 }).addTo(map);
+            polyline = L.polyline([], { color: '#3b82f6', weight: 4, opacity: 0.8, dashArray: '10, 10' }).addTo(map);
             historyLayerGroup = L.layerGroup().addTo(map);
             isMapInit = true;
         }
@@ -993,7 +1002,26 @@
             const latlng = [lat, lon];
             pathCoords.push(latlng);
             polyline.setLatLngs(pathCoords);
+            
             const pointMarker = L.circleMarker(latlng, { radius: 4, fillColor: "#3b82f6", color: "#fff", weight: 1, opacity: 1, fillOpacity: 0.8 });
+            
+            // Format Timestamp
+            // Ajuste manual de zona horaria (Corrección +4 horas si viene atrasada)
+            // El ESP32 envía timestamp. Si está atrasado 4h, sumamos 4h (14400 seg).
+            const dateObj = new Date((timestamp + 14400) * 1000);
+            const dateStr = dateObj.toLocaleDateString();
+            const timeStr = dateObj.toLocaleTimeString();
+            
+            // Bind Popup
+            pointMarker.bindPopup(`
+                <div style="text-align:center; color: #fff; background: #111; padding: 5px; border-radius: 5px;">
+                    <div style="font-weight:bold; font-size:14px; margin-bottom: 4px; color: #3b82f6;">HISTORIAL</div>
+                    <div style="font-size:13px; font-weight: bold; margin-bottom: 2px;">${dateStr}</div>
+                    <div style="font-size:13px; font-weight: bold; margin-bottom: 4px;">${timeStr}</div>
+                    <div style="font-size:11px; color:#aaa; font-family: monospace;">${lat.toFixed(5)}, ${lon.toFixed(5)}</div>
+                </div>
+            `);
+            
             historyLayerGroup.addLayer(pointMarker);
             if(pathCoords.length > 1) map.fitBounds(polyline.getBounds(), {padding: [50, 50]});
         }
