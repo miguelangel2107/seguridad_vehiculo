@@ -613,12 +613,15 @@
         </div>
 
         <div class="absolute bottom-8 left-4 right-4 z-[1001] flex flex-col gap-3 pointer-events-none">
-            <div class="grid grid-cols-2 gap-3 pointer-events-auto">
-                <button onclick="sendCommand('GET_HISTORY_LAST_50')" class="bg-black/80 backdrop-blur-md border border-white/10 text-white py-3 rounded-xl text-[10px] font-bold tracking-wider flex items-center justify-center gap-2 active:bg-blue-900/50 shadow-lg">
-                    <i class="fas fa-clock-rotate-left text-blue-400"></i> LAST 50
+            <div class="grid grid-cols-3 gap-2 pointer-events-auto">
+                <button onclick="sendCommand('GET_HISTORY_LAST_50')" class="bg-black/80 backdrop-blur-md border border-white/10 text-white py-3 rounded-xl text-[9px] font-bold tracking-wider flex flex-col items-center justify-center gap-1 active:bg-blue-900/50 shadow-lg hover:border-blue-500/30 transition-all">
+                    <i class="fas fa-clock-rotate-left text-blue-400 text-xs"></i> <span>LAST 50</span>
                 </button>
-                <button onclick="clearMapHistory()" class="bg-black/80 backdrop-blur-md border border-white/10 text-white py-3 rounded-xl text-[10px] font-bold tracking-wider flex items-center justify-center gap-2 active:bg-red-900/50 shadow-lg">
-                    <i class="fas fa-trash text-red-400"></i> CLEAR
+                <button onclick="sendCommandWithConfirm('GET_HISTORY_ALL', '¿Descargar todo el historial? Esto puede tomar un momento.')" class="bg-black/80 backdrop-blur-md border border-white/10 text-white py-3 rounded-xl text-[9px] font-bold tracking-wider flex flex-col items-center justify-center gap-1 active:bg-purple-900/50 shadow-lg hover:border-purple-500/30 transition-all">
+                    <i class="fas fa-database text-purple-400 text-xs"></i> <span>TODO</span>
+                </button>
+                <button onclick="clearMapHistory()" class="bg-black/80 backdrop-blur-md border border-white/10 text-white py-3 rounded-xl text-[9px] font-bold tracking-wider flex flex-col items-center justify-center gap-1 active:bg-red-900/50 shadow-lg hover:border-red-500/30 transition-all">
+                    <i class="fas fa-trash text-red-400 text-xs"></i> <span>CLEAR</span>
                 </button>
             </div>
         </div>
@@ -1028,8 +1031,15 @@
             else if(v < 11.5) document.getElementById('batt-status-text').innerText = "Baja";
             else document.getElementById('batt-status-text').innerText = "Normal";
 
-            if(data.gps && data.gps.includes(",") && !isMapInit) {
-                const p = data.gps.split(",");
+            // *** CORRECCIÓN GPS APLICADA AQUÍ ***
+            if(data.gps && data.gps.includes(",")) {
+                const parts = data.gps.split(",");
+                const lat = parseFloat(parts[0]);
+                const lon = parseFloat(parts[1]);
+                // Actualizar mapa si es válido y el mapa está listo
+                if(!isNaN(lat) && !isNaN(lon) && isMapInit) {
+                    updateMap(lat, lon);
+                }
             }
         }
 
