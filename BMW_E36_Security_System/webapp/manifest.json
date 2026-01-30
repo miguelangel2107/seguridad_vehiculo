@@ -1,0 +1,21 @@
+{
+  "name": "BMW Security Cloud",
+  "short_name": "BMW Security",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3097/3097180.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3097/3097180.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}

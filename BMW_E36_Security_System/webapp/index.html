@@ -2,9 +2,24 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <!-- Viewport optimizado para PWA (sin zoom al hacer tap) -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- Título -->
     <title>BMW Security Cloud V6.5</title>
     
+    <!-- ========================================== -->
+    <!-- CONFIGURACIÓN PWA (Progressive Web App)    -->
+    <!-- ========================================== -->
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="./manifest.json">
+    
+    <!-- ICONOS ONLINE -->
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3097/3097180.png">
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3097/3097180.png">
+
     <!-- Estilos y Utilidades -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
@@ -12,7 +27,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- FIREBASE COMPAT LIBRARIES (Solución pantalla blanca) -->
+    <!-- FIREBASE COMPAT LIBRARIES -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -22,10 +37,12 @@
         
         body { 
             font-family: 'Roboto', sans-serif; 
-            background: #000000; /* Fallback color */
+            background: #000000; 
             background: radial-gradient(circle at top center, #1a1a1a 0%, #000000 100%);
             color: #e0e0e0; 
             overflow: hidden; 
+            /* Previene el "pull-to-refresh" en móviles que arruina la experiencia de app */
+            overscroll-behavior-y: none;
         }
         .bmw-font { font-family: 'Orbitron', sans-serif; }
         .tech-font { font-family: 'Rajdhani', sans-serif; }
@@ -45,6 +62,8 @@
             transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
             position: relative;
             overflow: hidden;
+            /* Evita el highlight azul en móviles al tocar */
+            -webkit-tap-highlight-color: transparent;
         }
         .btn-action:active { transform: scale(0.96); }
         .btn-action::before {
@@ -137,6 +156,7 @@
             display: flex; justify-content: space-between; items-content: center;
             background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
             z-index: 50; flex-shrink: 0;
+            padding-top: env(safe-area-inset-top); /* Soporte para Notch de iPhone */
         }
         .content-area {
             flex: 1; overflow-y: auto; padding: 10px 16px 100px 16px; 
@@ -155,12 +175,14 @@
             align-items: center; 
             box-shadow: 0 10px 40px -10px rgba(0,0,0,0.8);
             z-index: 100;
+            margin-bottom: env(safe-area-inset-bottom); /* Soporte para barra inferior iPhone */
         }
         .nav-item {
             flex: 1; display: flex; flex-direction: column; 
             align-items: center; justify-content: center; 
             color: #666; transition: all 0.3s; gap: 4px; height: 100%;
             border-radius: 20px;
+            -webkit-tap-highlight-color: transparent;
         }
         .nav-item i { font-size: 20px; transition: transform 0.2s; }
         .nav-item span { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; opacity: 0; transform: translateY(10px); transition: all 0.2s; }
@@ -194,11 +216,15 @@
         }
         .btn-primary:active { transform: scale(0.98); }
 
-        /* Toast Corregido para visualizarse siempre */
+        /* Toast Corregido */
+        .toast-container {
+             position: fixed; top: 1.5rem; left: 1rem; right: 1rem; z-index: 9999;
+             pointer-events: none;
+        }
         #toast-notification {
             transform: translateY(-200%); 
             transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 9999; /* Z-Index muy alto */
+            pointer-events: auto;
         }
         #toast-notification.show { transform: translateY(0); }
         
@@ -208,14 +234,16 @@
 </head>
 <body class="select-none">
 
-    <!-- TOAST -->
-    <div id="toast-notification" class="fixed top-6 left-4 right-4 rounded-2xl p-4 shadow-2xl flex items-center gap-4 border-l-4 border border-white/10 backdrop-blur-md bg-gray-900/90">
-        <div class="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center shrink-0 border border-white/10">
-            <i id="toast-icon" class="fas fa-bell text-xl text-white"></i>
-        </div>
-        <div>
-            <h4 id="toast-title" class="text-xs font-bold uppercase tracking-widest text-white/90">Notificación</h4>
-            <p id="toast-message" class="text-sm text-white font-medium">Mensaje</p>
+    <!-- TOAST WRAPPER -->
+    <div class="toast-container">
+        <div id="toast-notification" class="rounded-2xl p-4 shadow-2xl flex items-center gap-4 border-l-4 border border-white/10 backdrop-blur-md bg-gray-900/90">
+            <div class="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center shrink-0 border border-white/10">
+                <i id="toast-icon" class="fas fa-bell text-xl text-white"></i>
+            </div>
+            <div>
+                <h4 id="toast-title" class="text-xs font-bold uppercase tracking-widest text-white/90">Notificación</h4>
+                <p id="toast-message" class="text-sm text-white font-medium">Mensaje</p>
+            </div>
         </div>
     </div>
 
@@ -587,7 +615,6 @@
                     </button>
                 </div>
             </div>
-
         </div> 
 
         <div class="bottom-nav">
@@ -909,19 +936,19 @@
             tit.innerText = title; 
             mess.innerText = msg;
             
-            const baseClasses = "fixed top-6 left-4 right-4 z-[5000] rounded-2xl p-4 shadow-2xl flex items-center gap-4 border border-white/10 backdrop-blur-md transition-all duration-300 border-l-4";
+            const baseClasses = "rounded-2xl p-4 shadow-2xl flex items-center gap-4 border border-white/10 backdrop-blur-md transition-all duration-300 border-l-4 bg-gray-900/90";
             
             let theme = "";
             let iconCls = "";
             
             if (type === 'face') { 
-                theme = "border-yellow-500 bg-yellow-900/90";
+                theme = "border-yellow-500";
                 iconCls = "fas fa-user-check text-xl text-yellow-400";
             } else if (type === 'error') { 
-                theme = "border-red-500 bg-red-900/90";
+                theme = "border-red-500";
                 iconCls = "fas fa-triangle-exclamation text-xl text-red-400";
             } else { 
-                theme = "border-green-500 bg-green-900/90";
+                theme = "border-green-500";
                 iconCls = "fas fa-check-circle text-xl text-green-400";
             }
 
@@ -1006,8 +1033,6 @@
             const pointMarker = L.circleMarker(latlng, { radius: 4, fillColor: "#3b82f6", color: "#fff", weight: 1, opacity: 1, fillOpacity: 0.8 });
             
             // Format Timestamp
-            // Ajuste manual de zona horaria (Corrección +4 horas si viene atrasada)
-            // El ESP32 envía timestamp. Si está atrasado 4h, sumamos 4h (14400 seg).
             const dateObj = new Date((timestamp + 14400) * 1000);
             const dateStr = dateObj.toLocaleDateString();
             const timeStr = dateObj.toLocaleTimeString();
@@ -1095,6 +1120,21 @@
 
         function setBoxActive(id, color) { document.getElementById(id).style.opacity = 1; document.getElementById(id).style.transform = "scale(1.1)"; document.getElementById(id).querySelector('i').className = `fas ${document.getElementById(id).querySelector('i').classList[1]} text-xl ${color}`; }
         function setBoxInactive(id) { document.getElementById(id).style.opacity = 0.5; document.getElementById(id).style.transform = "scale(1)"; document.getElementById(id).querySelector('i').className = `fas ${document.getElementById(id).querySelector('i').classList[1]} text-xl text-white`; }
+
+        // ==========================================
+        // REGISTRO DEL SERVICE WORKER
+        // ==========================================
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registrado con éxito:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('Falló el registro del ServiceWorker:', error);
+                    });
+            });
+        }
     </script>
 </body>
 </html>
