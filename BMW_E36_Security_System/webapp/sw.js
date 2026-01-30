@@ -1,8 +1,8 @@
-const CACHE_NAME = 'bmw-security-v2-online';
+const CACHE_NAME = 'auto-security-v3-local';
 const urlsToCache = [
   './index.html',
   './manifest.json',
-  // He quitado el icon.png de aquí para evitar errores si no existe localmente
+  './icon.png', // Icono local añadido de nuevo
   'https://cdn.tailwindcss.com',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];

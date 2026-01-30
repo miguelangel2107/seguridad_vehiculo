@@ -1,6 +1,6 @@
 {
-  "name": "BMW Security Cloud",
-  "short_name": "BMW Security",
+  "name": "Auto Security Cloud",
+  "short_name": "Auto Security",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#000000",
@@ -8,12 +8,12 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3097/3097180.png",
+      "src": "./icon.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3097/3097180.png",
+      "src": "./icon.png",
       "type": "image/png",
       "sizes": "512x512"
     }
