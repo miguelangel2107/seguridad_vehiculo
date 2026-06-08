@@ -153,7 +153,7 @@
         /* Header App */
         .header-bar {
             height: 70px; padding: 0 20px;
-            display: flex; justify-content: space-between; items-content: center;
+            display: flex; justify-content: space-between; align-items: center;
             background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
             z-index: 50; flex-shrink: 0;
             padding-top: env(safe-area-inset-top); /* Soporte para Notch de iPhone */
@@ -230,6 +230,20 @@
         
         .loader { border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top: 3px solid #3b82f6; width: 24px; height: 24px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Elementos Dashboard de Voltaje */
+        .battery-bar-bg {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            height: 6px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .battery-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease-in-out, background-color 0.5s ease;
+        }
     </style>
 </head>
 <body class="select-none">
@@ -420,7 +434,7 @@
                                 </div>
                                 <span id="batt-val" class="text-sm font-bold text-white tech-font">--.- V</span>
                             </div>
-                            <div class="battery-bar-bg mb-1.5"><div id="batt-bar" class="battery-bar-fill bg-gray-600" style="width: 0%"></div></div>
+                            <div class="battery-bar-bg mb-1.5"><div id="batt-bar" class="battery-bar-fill" style="width: 0%"></div></div>
                             <div class="flex justify-between"><span id="batt-status-text" class="text-[8px] text-gray-500 uppercase tracking-widest font-bold">Sin Datos</span></div>
                         </div>
                     </div>
@@ -637,6 +651,7 @@
         </div>
     </div>
 
+    <!-- PANTALLA MAPA FULLSCREEN -->
     <div id="map-screen">
         <div class="absolute top-0 left-0 right-0 z-[1001] p-4 bg-gradient-to-b from-black/90 to-transparent pointer-events-none flex justify-between items-start">
             <button onclick="hideMapScreen()" class="pointer-events-auto bg-black/60 backdrop-blur-md w-10 h-10 rounded-full flex items-center justify-center border border-white/10 text-white shadow-lg active:scale-95 transition-transform">
@@ -689,7 +704,7 @@
         let currentUserData = null;
         let lockoutTimerInterval = null;
         
-        // MQTT
+        // MQTT & MAP GLOBALS
         const MQTT_BROKER = "broker.hivemq.com";
         const MQTT_PORT = 8884; 
         let client;
@@ -697,6 +712,10 @@
         let pathCoords = [];
         let isMapInit = false;
         let DEVICE_ID = null;
+
+        // Variables de Respaldo de Coordenadas
+        let lastLatVal = -16.5000;
+        let lastLonVal = -68.1500;
 
         // AUTH OBSERVER
         auth.onAuthStateChanged(async (user) => {
@@ -851,7 +870,6 @@
             
             const logos = { 'BMW': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/1024px-BMW.svg.png', 'TOYOTA': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Toyota_carlogo.svg/1200px-Toyota_carlogo.svg.png', 'AUDI': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/Audi-Logo_2016.svg/1200px-Audi-Logo_2016.svg.png', 'MERCEDES': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Mercedes-Logo.svg/1024px-Mercedes-Logo.svg.png', 'NISSAN': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Nissan_logo.png/1024px-Nissan_logo.png', 'VOLKSWAGEN': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Volkswagen_logo_2019.svg/1024px-Volkswagen_logo_2019.svg.png', 'SUZUKI': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Suzuki_logo_2.svg/1200px-Suzuki_logo_2.svg.png' };
             if(logos[data.brand]) document.getElementById('app-brand-logo').src = logos[data.brand];
-            // No need to show client id anymore if owner name is there, or can be in maintenance tab
         }
 
         // --- MQTT ---
@@ -883,6 +901,7 @@
             }
         }
 
+        // --- PROCESADO DE MENSAJES MQTT RECIBIDOS ---
         function onMessageArrived(message) {
             try {
                 let payload = message.payloadString.replace(/'/g, '"');
@@ -893,12 +912,31 @@
                         if(data.alert === "FACE_UNLOCK") showNotification("ACCESO BIOMÉTRICO", "Usuario: " + (data.user || "Desconocido"), 'face');
                         else if(data.alert === "INFO") showNotification("SISTEMA", data.msg, 'info');
                         else showNotification("ALERTA SEGURIDAD", data.msg || data.alert, 'error');
-                    } else if (data.m !== undefined) { 
+                    } 
+                    // *** EXTRACCIÓN DIRECTA DE GPS DESDE EL MÓDEM A9G ***
+                    else if (data.origen === "A9G") {
+                        if(data.lat && data.lon) {
+                            const lat = parseFloat(data.lat);
+                            const lon = parseFloat(data.lon);
+                            
+                            // Guardar coordenadas de respaldo si se reciben antes de abrir la pestaña de mapa
+                            if(!isNaN(lat) && !isNaN(lon) && lat !== 0.0 && lon !== 0.0) {
+                                lastLatVal = lat;
+                                lastLonVal = lon;
+                                if(isMapInit) {
+                                    updateMap(lat, lon);
+                                } else {
+                                    document.getElementById('map-coords').innerText = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+                                }
+                            }
+                        }
+                    }
+                    // *** TELEMETRÍA DEL VEHÍCULO DESDE EL ESP32 (Ignora su campo gps "g") ***
+                    else if (data.m !== undefined) { 
                         const translatedData = {
                             mode: ["LOCKED", "ACC_ON", "IGN_ON", "RUNNING"][data.m],
                             batt: (data.b !== undefined) ? data.b : 0,
                             chapa: (data.k !== undefined) ? data.k : 0,
-                            gps: (data.g !== undefined) ? data.g : "0,0",
                             go: (data.go !== undefined) ? data.go : 0,
                             s: (data.s !== undefined) ? data.s : 0
                         };
@@ -922,6 +960,59 @@
         function sendCommandWithConfirm(cmd, txt) { if(confirm(txt)) sendCommand(cmd); }
 
         // --- UI UTILS ---
+        // Actualiza Voltaje, Estado de Chapa y Modos
+        function updateDashboard(data) {
+            const modeText = document.getElementById('vehicle-mode');
+            modeText.innerText = data.mode;
+            
+            setButtonNeutral('btn-ctrl-unlock', 'fa-unlock');
+            setButtonNeutral('btn-ctrl-lock', 'fa-lock');
+            setButtonNeutral('btn-ctrl-ign', 'fa-key');
+            setButtonNeutral('btn-ctrl-start', 'fa-power-off');
+
+            if(data.mode === "LOCKED") {
+                modeText.className = "text-4xl bmw-font text-red-500 font-bold tracking-wider drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]";
+                setBoxActive('box-lock', 'text-red-500'); setBoxInactive('box-acc'); setBoxInactive('box-ign'); setBoxInactive('box-run'); 
+                setButtonActive('btn-ctrl-lock', 'btn-active-red', 'text-red-200');
+            }
+            else if(data.mode === "RUNNING") {
+                modeText.className = "text-4xl bmw-font text-orange-500 font-bold tracking-wider drop-shadow-[0_0_15px_rgba(249,115,22,0.5)] animate-pulse";
+                setBoxInactive('box-lock'); setBoxActive('box-acc', 'text-blue-400'); setBoxActive('box-ign', 'text-green-400'); setBoxActive('box-run', 'text-orange-400'); 
+                setButtonActive('btn-ctrl-start', 'btn-active-orange', 'text-orange-200');
+            }
+            else { 
+                modeText.className = "text-4xl bmw-font text-white font-bold tracking-wider drop-shadow-xl mb-4"; 
+                setBoxInactive('box-lock'); setBoxInactive('box-run');
+                if(data.mode !== "LOCKED") { setBoxActive('box-acc', 'text-blue-400'); setButtonActive('btn-ctrl-unlock', 'btn-active-blue', 'text-blue-200'); } else setBoxInactive('box-acc');
+                if(data.mode === "IGN_ON") { setBoxActive('box-ign', 'text-green-400'); setButtonActive('btn-ctrl-ign', 'btn-active-green', 'text-green-200'); } else setBoxInactive('box-ign');
+            }
+
+            const v = parseFloat(data.batt || 0);
+            document.getElementById('batt-val').innerText = v.toFixed(1) + " V";
+            
+            // Renderizado de porcentaje de la barra de batería (Rango: 10.5V a 14.5V)
+            let pct = ((v - 10.5) / (14.5 - 10.5)) * 100;
+            if (pct < 0) pct = 0;
+            if (pct > 100) pct = 100;
+            
+            const bBar = document.getElementById('batt-bar');
+            bBar.style.width = pct + "%";
+            
+            if (v > 13.0) {
+                document.getElementById('batt-status-text').innerText = "Cargando (Alternador OK)";
+                bBar.className = "battery-bar-fill bg-green-500 shadow-[0_0_10px_#22c55e]";
+            } else if (v < 11.5 && v > 1.0) {
+                document.getElementById('batt-status-text').innerText = "Alerta (Batería muy Baja o Sabotaje)";
+                bBar.className = "battery-bar-fill bg-red-500 shadow-[0_0_10px_#ef4444]";
+            } else if (v <= 1.0) {
+                document.getElementById('batt-status-text').innerText = "Sin datos de batería principal";
+                bBar.className = "battery-bar-fill bg-gray-600";
+            } else {
+                document.getElementById('batt-status-text').innerText = "Normal (Reposo)";
+                bBar.className = "battery-bar-fill bg-blue-500 shadow-[0_0_10px_#3b82f6]";
+            }
+        }
+
         function showScreen(id) {
             document.querySelectorAll('.screen-container').forEach(el => el.classList.remove('active'));
             document.getElementById(id).classList.add('active');
@@ -996,6 +1087,7 @@
             if(data.chapa !== undefined) document.getElementById('switch-keylogic').checked = (data.chapa == 1);
         }
 
+        // --- MAP FUNCTIONS ---
         function showMapScreen() {
             document.getElementById('map-screen').classList.add('visible');
             if(!isMapInit) setTimeout(initFullMap, 300);
@@ -1007,13 +1099,15 @@
 
         function initFullMap() {
             if(map || isMapInit) return; 
-            map = L.map('full-map', { zoomControl: false }).setView([-16.5000, -68.1500], 15);
+            // Inicializar el mapa centrado en las últimas coordenadas recibidas del A9G
+            map = L.map('full-map', { zoomControl: false }).setView([lastLatVal, lastLonVal], 15);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
             const carIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3097/3097180.png', iconSize: [40, 40], iconAnchor: [20, 20] });
-            marker = L.marker([-16.5000, -68.1500], {icon: carIcon, zIndexOffset: 1000}).addTo(map);
+            marker = L.marker([lastLatVal, lastLonVal], {icon: carIcon, zIndexOffset: 1000}).addTo(map);
             polyline = L.polyline([], { color: '#3b82f6', weight: 4, opacity: 0.8, dashArray: '10, 10' }).addTo(map);
             historyLayerGroup = L.layerGroup().addTo(map);
             isMapInit = true;
+            document.getElementById('map-coords').innerText = `${lastLatVal.toFixed(5)}, ${lastLonVal.toFixed(5)}`;
         }
 
         function updateMap(lat, lon) {
@@ -1025,6 +1119,9 @@
         }
 
         function addToHistory(lat, lon, timestamp) {
+            if(!isMapInit) {
+                initFullMap();
+            }
             if(!map) return;
             const latlng = [lat, lon];
             pathCoords.push(latlng);
@@ -1051,50 +1148,6 @@
             if(pathCoords.length > 1) map.fitBounds(polyline.getBounds(), {padding: [50, 50]});
         }
         function clearMapHistory() { pathCoords = []; if(polyline) polyline.setLatLngs([]); if(historyLayerGroup) historyLayerGroup.clearLayers(); showNotification("MAPA LIMPIO", "Historial borrado", 'info'); }
-
-        function updateDashboard(data) {
-            const modeText = document.getElementById('vehicle-mode');
-            modeText.innerText = data.mode;
-            
-            setButtonNeutral('btn-ctrl-unlock', 'fa-unlock');
-            setButtonNeutral('btn-ctrl-lock', 'fa-lock');
-            setButtonNeutral('btn-ctrl-ign', 'fa-key');
-            setButtonNeutral('btn-ctrl-start', 'fa-power-off');
-
-            if(data.mode === "LOCKED") {
-                modeText.className = "text-4xl bmw-font text-red-500 font-bold tracking-wider drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]";
-                setBoxActive('box-lock', 'text-red-500'); setBoxInactive('box-acc'); setBoxInactive('box-ign'); setBoxInactive('box-run'); 
-                setButtonActive('btn-ctrl-lock', 'btn-active-red', 'text-red-200');
-            }
-            else if(data.mode === "RUNNING") {
-                modeText.className = "text-4xl bmw-font text-orange-500 font-bold tracking-wider drop-shadow-[0_0_15px_rgba(249,115,22,0.5)] animate-pulse";
-                setBoxInactive('box-lock'); setBoxActive('box-acc', 'text-blue-400'); setBoxActive('box-ign', 'text-green-400'); setBoxActive('box-run', 'text-orange-400'); 
-                setButtonActive('btn-ctrl-start', 'btn-active-orange', 'text-orange-200');
-            }
-            else { 
-                modeText.className = "text-4xl bmw-font text-white font-bold tracking-wider drop-shadow-xl mb-4"; 
-                setBoxInactive('box-lock'); setBoxInactive('box-run');
-                if(data.mode !== "LOCKED") { setBoxActive('box-acc', 'text-blue-400'); setButtonActive('btn-ctrl-unlock', 'btn-active-blue', 'text-blue-200'); } else setBoxInactive('box-acc');
-                if(data.mode === "IGN_ON") { setBoxActive('box-ign', 'text-green-400'); setButtonActive('btn-ctrl-ign', 'btn-active-green', 'text-green-200'); } else setBoxInactive('box-ign');
-            }
-
-            const v = parseFloat(data.batt || 0);
-            document.getElementById('batt-val').innerText = v.toFixed(1) + " V";
-            if(v > 13.0) document.getElementById('batt-status-text').innerText = "Cargando";
-            else if(v < 11.5) document.getElementById('batt-status-text').innerText = "Baja";
-            else document.getElementById('batt-status-text').innerText = "Normal";
-
-            // *** CORRECCIÓN GPS APLICADA AQUÍ ***
-            if(data.gps && data.gps.includes(",")) {
-                const parts = data.gps.split(",");
-                const lat = parseFloat(parts[0]);
-                const lon = parseFloat(parts[1]);
-                // Actualizar mapa si es válido y el mapa está listo
-                if(!isNaN(lat) && !isNaN(lon) && isMapInit) {
-                    updateMap(lat, lon);
-                }
-            }
-        }
 
         function setButtonActive(id, activeClass, textClass) {
             const btn = document.getElementById(id);
