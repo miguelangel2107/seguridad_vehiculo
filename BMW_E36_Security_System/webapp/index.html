@@ -270,8 +270,8 @@
                     <i class="fas fa-sync-alt text-[var(--blynk-blue)] text-xs"></i>
                 </button>
                 <!-- Status pill estilo blynk -->
-                <div class="px-3 py-1.5 rounded-full bg-[#1c1c1e] border border-[#2c2c2e] text-[10px] font-bold text-[var(--blynk-green)] tracking-wider flex items-center gap-2">
-                    <i class="fas fa-signal"></i> 4G
+                <div id="signal-pill" class="px-3 py-1.5 rounded-full bg-[#1c1c1e] border border-[#2c2c2e] text-[10px] font-bold text-[var(--blynk-red)] tracking-wider flex items-center gap-2 transition-colors duration-300">
+                    <i id="signal-icon" class="fas fa-signal"></i> <span id="signal-text">NO SIGNAL</span>
                 </div>
             </div>
         </div>
@@ -578,6 +578,7 @@
                 const st = document.getElementById('connection-status');
                 st.innerHTML = '<span class="w-2 h-2 rounded-full bg-[var(--blynk-red)] animate-pulse"></span> OFFLINE';
                 st.className = "text-[10px] text-[var(--blynk-red)] flex items-center gap-1.5 uppercase font-bold tracking-wider mt-0.5 transition-colors";
+                updateSignalStrength(99); // Resetear señal a rojo por desconexión
                 setTimeout(connectMQTT, 5000);
             }
         }
@@ -595,6 +596,9 @@
                         else showNotification("ALERTA SEGURIDAD", data.msg || data.alert, 'error');
                     } 
                     else if (data.origen === "A9G") {
+                        if(data.csq !== undefined) {
+                            updateSignalStrength(data.csq);
+                        }
                         if(data.lat && data.lon) {
                             const lat = parseFloat(data.lat);
                             const lon = parseFloat(data.lon);
@@ -784,6 +788,28 @@
             if(data.go !== undefined) document.getElementById('switch-gps').checked = (data.go == 1);
             if(data.s !== undefined) document.getElementById('switch-stealth').checked = (data.s == 1);
             if(data.chapa !== undefined) document.getElementById('switch-keylogic').checked = (data.chapa == 1);
+        }
+
+        // --- LÓGICA DE SEÑAL CSQ ---
+        function updateSignalStrength(csq) {
+            const pill = document.getElementById('signal-pill');
+            const text = document.getElementById('signal-text');
+
+            const baseClass = "px-3 py-1.5 rounded-full bg-[#1c1c1e] border border-[#2c2c2e] text-[10px] font-bold tracking-wider flex items-center gap-2 transition-colors duration-300 ";
+
+            if (csq === undefined || csq === 99 || csq === 0) {
+                pill.className = baseClass + "text-[var(--blynk-red)]";
+                text.innerText = "NO SIGNAL";
+            } else if (csq < 10) {
+                pill.className = baseClass + "text-[var(--blynk-orange)]";
+                text.innerText = "WEAK";
+            } else if (csq < 20) {
+                pill.className = baseClass + "text-[var(--blynk-blue)]";
+                text.innerText = "GOOD";
+            } else {
+                pill.className = baseClass + "text-[var(--blynk-green)]";
+                text.innerText = "4G LTE";
+            }
         }
 
         // --- MAP FUNCTIONS ---
