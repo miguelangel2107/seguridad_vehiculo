@@ -519,6 +519,7 @@
         let map, marker, polyline, historyLayerGroup;
         let pathCoords = [];
         let isMapInit = false;
+        let isConnecting = false; // Bandera para evitar multiples llamadas simultaneas
         
         // HARDCODED BYPASS VALUES
         let DEVICE_ID = "BMW001";
@@ -545,6 +546,15 @@
             }, 2500);
         });
 
+        // Event listener de visibilidad: Fuerza la reconexión el milisegundo exacto que vuelves a la app
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                if (!client || !client.isConnected()) {
+                    connectMQTT();
+                }
+            }
+        });
+
         // --- APP UI ---
         function initAppUI(data) {
             showScreen('screen-app');
@@ -555,15 +565,30 @@
 
         // --- MQTT ---
         function connectMQTT() {
-            if(!DEVICE_ID) return;
+            if(!DEVICE_ID || isConnecting || (client && client.isConnected())) return;
+            
+            isConnecting = true;
+            
+            // Indicador visual de intento de conexión
+            const st = document.getElementById('connection-status');
+            st.innerHTML = '<span class="w-2 h-2 rounded-full bg-[var(--blynk-orange)] animate-pulse"></span> RECONNECTING...';
+            st.className = "text-[10px] text-[var(--blynk-orange)] flex items-center gap-1.5 uppercase font-bold tracking-wider mt-0.5 transition-colors";
+
             const clientId = "BlynkWeb_" + Math.random().toString(16).substr(2, 8);
             client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, clientId);
             client.onConnectionLost = onConnectionLost;
             client.onMessageArrived = onMessageArrived;
-            client.connect({ useSSL: true, timeout: 3, onSuccess: onConnect });
+            
+            client.connect({ 
+                useSSL: true, 
+                timeout: 3, 
+                onSuccess: onConnect,
+                onFailure: onFailure
+            });
         }
 
         function onConnect() {
+            isConnecting = false;
             const st = document.getElementById('connection-status');
             st.innerHTML = '<span class="w-2 h-2 rounded-full bg-[var(--blynk-green)] shadow-[0_0_8px_var(--blynk-green)]"></span> ONLINE';
             st.className = "text-[10px] text-[var(--blynk-green)] flex items-center gap-1.5 uppercase font-bold tracking-wider mt-0.5 transition-colors";
@@ -573,13 +598,27 @@
             sendCommand("GET_STATUS");
         }
 
+        function onFailure(responseObject) {
+            isConnecting = false;
+            const st = document.getElementById('connection-status');
+            st.innerHTML = '<span class="w-2 h-2 rounded-full bg-[var(--blynk-red)] animate-pulse"></span> OFFLINE';
+            st.className = "text-[10px] text-[var(--blynk-red)] flex items-center gap-1.5 uppercase font-bold tracking-wider mt-0.5 transition-colors";
+            updateSignalStrength(99); 
+            
+            // Reintento continuo
+            setTimeout(connectMQTT, 3000);
+        }
+
         function onConnectionLost(responseObject) {
+            isConnecting = false;
             if (responseObject.errorCode !== 0) {
                 const st = document.getElementById('connection-status');
                 st.innerHTML = '<span class="w-2 h-2 rounded-full bg-[var(--blynk-red)] animate-pulse"></span> OFFLINE';
                 st.className = "text-[10px] text-[var(--blynk-red)] flex items-center gap-1.5 uppercase font-bold tracking-wider mt-0.5 transition-colors";
                 updateSignalStrength(99); // Resetear señal a rojo por desconexión
-                setTimeout(connectMQTT, 5000);
+                
+                // Reintento continuo
+                setTimeout(connectMQTT, 3000);
             }
         }
 
@@ -639,7 +678,8 @@
                 // Solo si el navegador soporta vibración
                 if(navigator.vibrate) navigator.vibrate(20);
             } else {
-                showNotification("Aviso", "No conectado al vehículo", "error");
+                showNotification("Aviso", "No conectado al vehículo. Reconectando...", "error");
+                connectMQTT(); // Forzar intento de conexión al enviar un comando fallido
             }
         }
 
